@@ -1,22 +1,25 @@
 const express=require('express')
 const app=express()
 const port= 3000
-const post=require('./routes/posts')
-const connectDB=require('./database & models/DBconnection')
 const bodyParser=require('body-parser');
-const courses=require('./routes/studentMarks')
-const postSchema=require('./database & models/PostModel');
-const onlineClass=require('./routes/onlineClasses');
+const login=require('./routes/logIn');
+const db=require('./database & models/databaseConnection')
+const StudentMarks=require('./routes/studentMarks')
+const Profile=require('./routes/profile')
+
 
 
 app.use(bodyParser.json());
-app.use('/course',courses);
-app.use('/posts',post);
-app.use('/onlineClass',onlineClass);
+app.use('/login',login)
+app.use('/marks',StudentMarks)
+app.use('/profile',Profile)
+
+
+
+
 
 const Start=()=>{
     try{
-       connectDB();
         app.listen(port,()=>{
           console.log(`server is listerning to ${port} ...`)
       })
