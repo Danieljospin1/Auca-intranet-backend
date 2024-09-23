@@ -7,6 +7,8 @@ const DBconnection=mysql.createPool({
   password:'Bisubizo@2001',
   database:'INTRANET',
   connectionLimit:100,
+  dateStrings:['TIMESTAMP','TIMESTAMP'],
+  timezone:'local'
 
 })
 const connectionPromise=DBconnection.promise();

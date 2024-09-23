@@ -21,7 +21,7 @@ router.post('/',async(req,res)=>{
             res.status(401).json("invalid user credentials")
         }
         else{
-            const accessToken=token.sign({"studentId":Id},process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1d'})
+            const accessToken=token.sign({"studentId":Id},process.env.ACCESS_TOKEN_SECRET,{expiresIn:'225s'})
             const refreshToken=token.sign({"studentId":Id},process.env.REFRESH_TOKEN_SECRET,{expiresIn:'15d'})
             res.status(200).send({accessToken,refreshToken});
         }
