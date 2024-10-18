@@ -5,11 +5,8 @@ const DBconnection=mysql.createPool({
   host:'localhost',
   user:'root',
   password:'Bisubizo@2001',
-  database:'INTRANET',
-  connectionLimit:100,
-  dateStrings:['TIMESTAMP','TIMESTAMP'],
-  timezone:'local'
-
-})
+  database:'intranet',
+  
+});
 const connectionPromise=DBconnection.promise();
 module.exports=connectionPromise;

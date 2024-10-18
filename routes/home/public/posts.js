@@ -39,9 +39,12 @@ router.post('/',upload.single('post'),auth,async(req,res)=>{
         }
         else{
             res.status(200).send('post uploaded successfully...')
+            console.log(file.filename)
 
-            const uploadImage=await connectionPromise.query(`insert into posts(PostedbyId,Description,PostImage,Audience) values (${postedById},'${description}','${escapedFilePath}','${audience}')`).then(()=>{
-                return res.status(200).json({message:`Post updated successfully...`})
+            const uploadImage=await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience) values (${postedById},'${escapedFilePath}','${description}','${audience}')`).then(()=>{
+                 res.status(200).json({message:`Post updated successfully...`})
+                 
+                
                 
             })
             
@@ -54,10 +57,12 @@ router.post('/',upload.single('post'),auth,async(req,res)=>{
 })
 
 
-router.get('/',async(req,res)=>{
+router.get('/',auth,async(req,res)=>{
     try{
-        const [posts]=await connectionPromise.query('select * from posts')
-        res.json(posts);
+        const studentFaculty="IT"
+        const id=req.user.studentId
+        const posts=await connectionPromise.query(`select * from posts where Audience='${studentFaculty}'`)
+        res.json(posts[0])
         
     }
     catch{(err)=>{

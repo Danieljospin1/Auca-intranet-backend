@@ -4,17 +4,29 @@ const port= 3000
 const bodyParser=require('body-parser');
 const login=require('./routes/logIn');
 const db=require('./database & models/databaseConnection')
-const StudentMarks=require('./routes/studentMarks')
-const Profile=require('./routes/profile')
-const posts=require('./routes/posts')
+const StudentMarks=require('./routes/home/private/studentMarks')
+const studentProfile=require('./routes/studentProfile')
+const staffProfile=require('./routes/staffProfile')
+const posts=require('./routes/home/public/posts')
+const comments=require('./routes/home/public/comments')
+const likes=require('./routes/home/public/likes')
+const dislikes=require('./routes/home/public/dislikes')
+const neutral=require('./routes/home/public/neutral')
+const classGroups=require('./routes/class/classGroupsChat/groupChats')
 
 
 
 app.use(bodyParser.json());
 app.use('/login',login)
 app.use('/marks',StudentMarks)
-app.use('/profile',Profile)
+app.use('/student/profile',studentProfile)
+app.use('/staff/profile',staffProfile)
 app.use('/home/posts',posts)
+app.use('/home/posts/comment',comments)
+app.use('/home/posts/likes',likes)
+app.use('/home/posts/dislike',dislikes)
+app.use('/home/posts/neutral',neutral)
+app.use('/class/classGroups',classGroups)
 
 
 
