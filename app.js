@@ -16,9 +16,9 @@ const classGroups=require('./routes/class/classGroupsChat/groupChats')
 
 
 
+
 app.use(bodyParser.json());
 app.use('/login',login)
-app.use('/marks',StudentMarks)
 app.use('/student/profile',studentProfile)
 app.use('/staff/profile',staffProfile)
 app.use('/home/posts',posts)
@@ -26,6 +26,7 @@ app.use('/home/posts/comment',comments)
 app.use('/home/posts/likes',likes)
 app.use('/home/posts/dislike',dislikes)
 app.use('/home/posts/neutral',neutral)
+app.use('/home/studentPerformance',StudentMarks)
 app.use('/class/classGroups',classGroups)
 
 

@@ -5,9 +5,9 @@ const auth=require('../../../Authentication/authentication')
 
 router.post('/',auth,async(req,res)=>{
     const {postId,comment}=req.body;
-    const userId=req.user.studentId
+    const userId=req.user.Id
     try{
-        const userComment=connectionPromise.query(`insert into comments (PostedById,Comment) values(${userId},'${comment}')`).then(
+        const userComment=connectionPromise.query(`insert into comments (PostId,CommentedById,Text) values(${postId},${userId},'${comment}')`).then(
             res.status(200).json({"message":"comment posted successfully..."})
         )
     }
