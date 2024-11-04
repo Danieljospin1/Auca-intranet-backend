@@ -10,13 +10,14 @@ const auth = require('../../../Authentication/authentication')
 // storing images on pc desktop
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
 const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
+const postsFolderLocation=path.join(uploadFolderPath,'posts')
 
 // defining image posts storage
 
 const storage = multer.diskStorage({
 
     destination: function (req, file, cb) {
-        cb(null, uploadFolderPath)
+        cb(null, postsFolderLocation)
     },
     filename: function (req, file, cb) {
         const fileName = Date.now() + path.extname(file.originalname)
@@ -38,6 +39,7 @@ router.post('/', upload.single('post'), auth, async (req, res) => {
         const escapedFilePath = filePath.replace(/\\/g, '\\\\');
         await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience,PostedBy) values (${postedById},'${escapedFilePath}','${description}','${audience}','${role}')`).then(() => {
             res.status(200).json({ message: `Post uploaded successfully...` })
+            console.log(typeof(file))
 
         })
     }
