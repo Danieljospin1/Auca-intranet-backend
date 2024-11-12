@@ -7,10 +7,10 @@ const fs = require('fs')
 const os = require('os')
 const auth = require('../../../Authentication/authentication')
 
-// storing images on pc desktop
+// storing images on server desktop
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
 const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const postsFolderLocation=path.join(uploadFolderPath,'posts')
+const postsFolderLocation = path.join(uploadFolderPath, 'posts')
 
 // defining image posts storage
 
@@ -27,25 +27,42 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.post('/', upload.single('post'), auth, async (req, res) => {
-    try {
-        const file = req.file;
-        const filePath = file.path;
-        const { description, audience } = req.body;
-        const postedById = req.user.Id;
-        const role = req.user.role;
+    const file = req.file;
 
+    const { description, audience } = req.body;
+    const postedById = req.user.Id;
+    const role = req.user.role;
+    const filePath = file.path;
+    const postImageUrl=`http://localhost:3000/home/posts/postImg/${path.basename(filePath)}`
+    if (file) {
+        try {
+            
+            // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
+            // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
+            await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience,PostedBy) values (${postedById},'${postImageUrl}','${description}','${audience}','${role}')`).then(() => {
+                res.status(200).json({ message: `Post uploaded successfully...` })
+                console.log(typeof (file))
 
-        // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
-        const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-        await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience,PostedBy) values (${postedById},'${escapedFilePath}','${description}','${audience}','${role}')`).then(() => {
-            res.status(200).json({ message: `Post uploaded successfully...` })
-            console.log(typeof(file))
-
-        })
+            })
+        }
+        catch {
+            (err) => {
+                console.log(err);
+            }
+        }
     }
-    catch {
-        (err) => {
-            console.log(err);
+    else {
+        try {
+            await connectionPromise.query(`insert into posts(CreatorId,Description,Audience,PostedBy) values (${postedById},'${description}','${audience}','${role}')`).then(() => {
+                res.status(200).json({ message: `Post uploaded successfully...` })
+                console.log(typeof (file))
+
+            })
+        }
+        catch {
+            (err) => {
+                console.log(err);
+            }
         }
     }
 })
@@ -56,22 +73,43 @@ router.get('/', auth, async (req, res) => {
     const id = req.user.Id
     const userRole = req.user.role
     try {
-        const [posts] = await connectionPromise.query(`select p.Id,
- s.StudentId,
- s.Fname,
- s.Lname,
- p.CreatorId,
- s.Faculty,
- p.ImageUrl,
- p.Description,
- p.Audience,
- p.Timestamp,
- count(case when l.PostId=p.Id then 1 end) as postlikes
- ,count(case when d.PostId=p.Id then 1 end) as postDislikes,
- count(case when n.PostId=p.Id then 1 end) as neutralReactions
- from posts p left join students s on p.CreatorId=s.StudentId left join
- likes l on p.Id=l.PostId left join dislikes d on p.Id=d.PostId left join neutral n on p.Id=n.PostId where p.Audience='${studentFaculty}' OR p.Audience='ALL' group by 
- p.Id order by p.Timestamp desc;`)
+        const [posts] = await connectionPromise.query(`SELECT 
+    p.Id,
+    s.StudentId,
+    s.Fname,
+    s.Lname,
+    p.CreatorId,
+    s.Faculty,
+    p.ImageUrl,
+    p.Description,
+    p.Audience,
+    p.Timestamp,
+    
+    
+    -- Subquery for counting likes
+    (SELECT COUNT(*) FROM likes l WHERE l.PostId = p.Id) AS postlikes,
+    
+    -- Subquery for counting dislikes
+    (SELECT COUNT(*) FROM dislikes d WHERE d.PostId = p.Id) AS postDislikes,
+    
+    -- Subquery for counting neutral reactions
+    (SELECT COUNT(*) FROM neutral n WHERE n.PostId = p.Id) AS neutralReactions,
+    
+    -- Subquery for counting comments
+    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS postComments
+    
+FROM 
+    posts p
+LEFT JOIN 
+    students s ON p.CreatorId = s.StudentId
+WHERE 
+    p.Audience = '${studentFaculty}' OR p.Audience = 'ALL'
+GROUP BY 
+    p.Id, s.StudentId, s.Fname, s.Lname, p.CreatorId, s.Faculty, p.ImageUrl, p.Description, p.Audience, p.Timestamp
+ORDER BY 
+    p.Timestamp DESC;
+
+`)
         res.status(200).json(posts)
     }
     catch {

@@ -15,7 +15,7 @@ const connectionPromise=require('../../../database & models/databaseConnection')
  router.delete('/',async(req,res)=>{
     try{
         const neutralId=req.body.neutralId;
-        const unliked=connectionPromise.query(`delete from neutral where NeutralId=${neutralId}`).then(
+        const unliked=connectionPromise.query(`delete from neutral where Id=${neutralId}`).then(
             res.status(200).json({"message":"unneutralised..."})
         )
     }

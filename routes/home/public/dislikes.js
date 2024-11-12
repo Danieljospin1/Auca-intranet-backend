@@ -1,10 +1,12 @@
 const express=require('express')
 const router=express.Router()
 const connectionPromise=require('../../../database & models/databaseConnection')
- router.post('/',async(req,res)=>{
+const auth=require('../../../Authentication/authentication')
+ router.post('/',auth,async(req,res)=>{
     try{
         const postId=req.body.postId;
-        const liked=connectionPromise.query(`insert into disliked(PostId) values(${postId})`).then(
+        const user=req.user.Id;
+        const liked=connectionPromise.query(`insert into dislikes(PostId,DislikedById) values(${postId},${user})`).then(
             res.status(200).json({"message":"disliked..."})
         )
     }
@@ -13,9 +15,10 @@ const connectionPromise=require('../../../database & models/databaseConnection')
     }}
  })
  router.delete('/',async(req,res)=>{
+    const user=req.user.Id;
     try{
         const dislikeId=req.body.dislikeId;
-        const unliked=connectionPromise.query(`delete from disliked where DislikeId=${dislikeId}`).then(
+        const unliked=connectionPromise.query(`delete from dislikes where DislikedById=${user}`).then(
             res.status(200).json({"message":"dislike removed..."})
         )
     }
