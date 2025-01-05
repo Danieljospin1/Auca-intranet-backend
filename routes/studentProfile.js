@@ -11,7 +11,7 @@ const { error } = require('console');
 router.get('/', auth, async (req, res) => {
     const userID = req.user.Id;
     try {
-        const [userProfile] = await connectionPromise.query(`select * from students where StudentId=${userID}`);
+        const [userProfile] = await connectionPromise.query(`select * from students where StudentId=?`,[userID]);
         res.status(200).send(userProfile[0]);
     }
     catch {
@@ -28,16 +28,16 @@ router.patch('/', auth, async (req, res) => {
     const StudentId = req.user.Id;
     try {
         if (Phone && Email) {
-            const [userProfile] = await connectionPromise.query(`update students set Phone=${Phone},Email='${Email}' where studentId=${StudentId} `)
+            const [userProfile] = await connectionPromise.query(`update students set Phone=?,Email=? where studentId=? `,[Phone,Email,StudentId])
             res.send("email and phone updated...")
         }
         if (Phone && !Email) {
-            const [userProfile] = await connectionPromise.query(`update students set Phone=${Phone} where StudentId=${StudentId}`);
+            const [userProfile] = await connectionPromise.query(`update students set Phone=? where StudentId=?`,[Phone,StudentId]);
             res.send("phone updated...")
         }
 
         if (!Phone && Email) {
-            const [userProfile] = await connectionPromise.query(`update students set Email='${Email}' where StudentId=${StudentId}`);
+            const [userProfile] = await connectionPromise.query(`update students set Email=? where StudentId=?}`,[Email,StudentId]);
             res.send("updated...")
 
 
@@ -79,7 +79,7 @@ router.post('/', upload.single('profile'), auth, async (req, res) => {
     const ProfileUrl=`http://localhost:3000/student/imgProfile/${path.basename(profilePath)}`
     try {
 
-        await connectionPromise.query(`update students set ProfileUrl='${ProfileUrl}' where StudentId=${StudentId}`).then(
+        await connectionPromise.query(`update students set ProfileUrl=? where StudentId=?`,[ProfileUrl,StudentId]).then(
             res.send('Profile uploaded...')
             
         ).catch((err)=>{

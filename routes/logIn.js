@@ -9,17 +9,17 @@ const connectionPromise = require('../database & models/databaseConnection');
 
 router.post('/', async (req, res) => {
     const { Id, Password, isStaff } = req.body;
-    if (!Id || !Password) {
+    if (!Id || !Password ) {
         res.json("message:Please input Your Id/Email And Password")
     }
 
     try {
-        if (isStaff == false) {
+        if (isStaff === false) {
             if (typeof (Id) == 'string') {
                 res.status(401).json({"message":'input valid id'})
             }
             else {
-                const [student] = await connectionPromise.query(`select * from students where StudentId=${Id} AND Password='${Password}'`);
+                const [student] = await connectionPromise.query(`select * from students where StudentId=? AND Password=?`,[Id,Password]);
 
 
 
@@ -37,8 +37,8 @@ router.post('/', async (req, res) => {
 
 
         }
-        if (isStaff == true) {
-            const [staffId] = await connectionPromise.query(`select Id from staff where Email='${Id}' AND Password='${Password}'`)
+        if (isStaff === true) {
+            const [staffId] = await connectionPromise.query(`select Id from staff where Email=? AND Password=?`,[Id,Password])
 
             if (!staffId[0]) {
                 res.status(401).json("invalid user credentials")

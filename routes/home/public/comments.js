@@ -8,13 +8,13 @@ router.post('/', auth, async (req, res) => {
     const userId = req.user.Id
     const userRole = req.user.role
     try {
-        const [checkPost] = await connectionPromise.query(`select * from posts where Id=${postId}`)
+        const [checkPost] = await connectionPromise.query(`select * from posts where Id=?`,[postId])
         if (checkPost == '') {
             res.status(400).json({ "message": "This post is no longer available..." })
 
         }
         else {
-            const userComment =await connectionPromise.query(`insert into comments (PostId,UserType,CommentedById,Text) values(${postId},'${userRole}',${userId},'${comment}')`).then(
+            const userComment =await connectionPromise.query(`insert into comments (PostId,UserType,CommentedById,Text) values(?,?,?,?)`,[postId,userRole,userId,comment]).then(
                 res.status(200).json({ "message": "comment posted successfully..." })
             )
         }
@@ -37,13 +37,17 @@ c.UserType,
 CASE 
     WHEN UserType = 'student' THEN CONCAT(s.Fname, ' ', s.Lname)
     ELSE CONCAT(st.Fname, ' ', st.Lname)
-END as commentorNames
+END as commentorNames,
+CASE
+WHEN UserType='student' THEN s.ProfileUrl
+ELSE st.ProfileUrl
+END as commentorProfile
 FROM 
 comments c
 LEFT JOIN 
 students s ON s.StudentId = c.CommentedById AND UserType = 'student'
 LEFT JOIN 
-staff st ON st.Id = c.CommentedById AND UserType = 'staff' where PostId=${postId} order by c.Timestamp asc`)
+staff st ON st.Id = c.CommentedById AND UserType = 'staff' where PostId=? order by c.Timestamp asc`,[postId])
         res.json(comments[0])
     }
     catch {

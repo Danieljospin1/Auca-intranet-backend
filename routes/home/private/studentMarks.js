@@ -7,7 +7,7 @@ const connectionPromise=require('../../../database & models/databaseConnection')
 router.get('/',auth,async(req,res)=>{
    const studentId=req.user.Id
    try{
-      const [marks]=await connectionPromise.query(`select * from registration where StudentId='${studentId}'`)
+      const [marks]=await connectionPromise.query(`select * from registration where StudentId=?`,[studentId])
       res.status(200).json(marks);
 
    }

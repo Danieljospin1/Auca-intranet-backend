@@ -32,14 +32,16 @@ router.post('/', upload.single('post'), auth, async (req, res) => {
     const { description, audience } = req.body;
     const postedById = req.user.Id;
     const role = req.user.role;
-    const filePath = file.path;
-    const postImageUrl=`http://localhost:3000/home/posts/postImg/${path.basename(filePath)}`
+    
+    
     if (file) {
+        const filePath = file.path;
+        const postImageUrl=`http://localhost:3000/home/posts/postImg/${path.basename(filePath)}`
         try {
             
             // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-            await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience,PostedBy) values (${postedById},'${postImageUrl}','${description}','${audience}','${role}')`).then(() => {
+            await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience,PostedBy) values (?,?,?,?,?)`,[postedById,postImageUrl,description,audience,role]).then(() => {
                 res.status(200).json({ message: `Post uploaded successfully...` })
                 console.log(typeof (file))
 
@@ -53,7 +55,7 @@ router.post('/', upload.single('post'), auth, async (req, res) => {
     }
     else {
         try {
-            await connectionPromise.query(`insert into posts(CreatorId,Description,Audience,PostedBy) values (${postedById},'${description}','${audience}','${role}')`).then(() => {
+            await connectionPromise.query(`insert into posts(CreatorId,Description,Audience,PostedBy) values (?,?,?,?)`,[postedById,description,audience,role]).then(() => {
                 res.status(200).json({ message: `Post uploaded successfully...` })
                 console.log(typeof (file))
 
@@ -73,43 +75,67 @@ router.get('/', auth, async (req, res) => {
     const id = req.user.Id
     const userRole = req.user.role
     try {
-        const [posts] = await connectionPromise.query(`SELECT 
+        const [posts] = await connectionPromise.query(`
+            SELECT 
     p.Id,
-    s.StudentId,
-    s.Fname,
-    s.Lname,
-    p.CreatorId,
-    s.Faculty,
+    -- Select the appropriate details based on whether the post is from a student or staff member
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
+        ELSE st.Id 
+    END AS CreatorId,
+    
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.Fname 
+        ELSE st.Fname 
+    END AS Fname,
+    
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.Lname 
+        ELSE st.Lname 
+    END AS Lname,
+    
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
+        ELSE st.ProfileUrl 
+    END AS ProfileUrl,
+    
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN 'Student' 
+        ELSE st.Role 
+    END AS Role,
+    
     p.ImageUrl,
     p.Description,
     p.Audience,
     p.Timestamp,
-    
-    
-    -- Subquery for counting likes
-    (SELECT COUNT(*) FROM likes l WHERE l.PostId = p.Id) AS postlikes,
-    
-    -- Subquery for counting dislikes
-    (SELECT COUNT(*) FROM dislikes d WHERE d.PostId = p.Id) AS postDislikes,
-    
-    -- Subquery for counting neutral reactions
-    (SELECT COUNT(*) FROM neutral n WHERE n.PostId = p.Id) AS neutralReactions,
-    
-    -- Subquery for counting comments
+
+    -- Subqueries for counting interactions
+    (SELECT COUNT(*) FROM postreactions l WHERE ReactionType='liked' and l.PostId = p.Id) AS postlikes,
+    (SELECT COUNT(*) FROM postreactions l WHERE ReactionType='disliked' and l.PostId = p.Id) AS postDislikes,
+    (SELECT COUNT(*) FROM postreactions l WHERE ReactionType='neutralized'and l.PostId = p.Id) AS neutralReactions,
     (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS postComments
-    
+
+
+
 FROM 
     posts p
+-- LEFT JOIN with students to get student information if the creator is a student
 LEFT JOIN 
     students s ON p.CreatorId = s.StudentId
+-- LEFT JOIN with staff to get staff information if the creator is a staff member
+LEFT JOIN 
+    staff st ON p.CreatorId = st.Id
 WHERE 
-    p.Audience = '${studentFaculty}' OR p.Audience = 'ALL'
+    p.Audience =? OR p.Audience = 'ALL'
 GROUP BY 
-    p.Id, s.StudentId, s.Fname, s.Lname, p.CreatorId, s.Faculty, p.ImageUrl, p.Description, p.Audience, p.Timestamp
+    p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
+    st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
+    p.CreatorId, p.ImageUrl, p.Description, p.Audience, p.Timestamp
 ORDER BY 
     p.Timestamp DESC;
 
-`)
+
+`,[studentFaculty])
         res.status(200).json(posts)
     }
     catch {

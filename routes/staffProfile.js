@@ -9,7 +9,7 @@ const multer=require('multer')
 router.get('/',auth,async(req,res)=>{
     const userID=req.user.Id;
     try{
-        const [staffProfile]=await connectionPromise.query(`select * from staff where Id='${userID}'`);
+        const [staffProfile]=await connectionPromise.query(`select * from staff where Id=?`,[userID]);
         res.status(200).send(staffProfile[0]);
     }
     catch{(err)=>{
@@ -39,7 +39,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.post('/',upload.single('profile'),auth,async(req,res)=>{
-    const StudentId = req.user.Id;
+    const userId = req.user.Id;
     const profile = req.file;
     const profilePath = profile.path;
     // escapedFilePath will convert a single backslash profile path to a double backslash to solve database problem
@@ -47,7 +47,7 @@ router.post('/',upload.single('profile'),auth,async(req,res)=>{
     const ProfileUrl=`http://localhost:3000/staff/imgProfile/${path.basename(profilePath)}`
     try {
 
-        await connectionPromise.query(`update staff set ProfileUrl='${ProfileUrl}' where Id=${StudentId}`).then(
+        await connectionPromise.query(`update staff set ProfileUrl=? where Id=?`,[ProfileUrl,userId]).then(
             res.send('Profile uploaded...')
             
         ).catch((err)=>{
