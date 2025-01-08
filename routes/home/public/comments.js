@@ -1,9 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const connectionPromise = require('../../../database & models/databaseConnection')
-const auth = require('../../../Authentication/authentication')
+const {Authenticate} = require('../../../Authentication/authentication')
 
-router.post('/', auth, async (req, res) => {
+router.post('/', Authenticate, async (req, res) => {
     const { postId, comment } = req.body;
     const userId = req.user.Id
     const userRole = req.user.role

@@ -1,9 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const connectionPromise = require('../../../database & models/databaseConnection')
-const auth = require('../../../Authentication/authentication')
+const {Authenticate} = require('../../../Authentication/authentication')
 
-router.post('/', auth, async (req, res) => {
+router.post('/', Authenticate, async (req, res) => {
     const postId = req.body.PostId;
     const reactionType = req.body.ReactionType;
     const userId = req.user.Id;
@@ -29,7 +29,7 @@ router.post('/', auth, async (req, res) => {
     }
 })
 
-router.delete('/', auth, async (req, res) => {
+router.delete('/', Authenticate, async (req, res) => {
     const postId = req.body.PostId;
     const userId = req.user.Id;
 

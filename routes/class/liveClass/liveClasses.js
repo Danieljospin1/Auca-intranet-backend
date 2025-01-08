@@ -1,11 +1,11 @@
 const express=require('express')
 const router=express.Router()
-const auth=require('../../../Authentication/authentication')
+const {Authenticate}=require('../../../Authentication/authentication')
 const connectionPromise=require('../../../database & models/databaseConnection')
 
 // the route for staff to be able to set live classes for their students
 
-router.post('/',auth,async(req,res)=>{
+router.post('/',Authenticate,async(req,res)=>{
     const{courseId,classGroupId,topic,platform,link}=req.body;
     const userId=req.user.Id;
     try{
@@ -18,7 +18,7 @@ router.post('/',auth,async(req,res)=>{
         res.status(500).json('Error creating live class...')
     }}
 })
-router.delete('/',auth,async(req,res)=>{
+router.delete('/',Authenticate,async(req,res)=>{
     const{classId}=req.body.liveClassId;
     try{
         await connectionPromise.query(`delete from liveclasses where Id=?`,[classId]);
@@ -29,7 +29,7 @@ router.delete('/',auth,async(req,res)=>{
     }
 })
 //route to get live classes posted
-router.get('/',auth,async(req,res)=>{
+router.get('/',Authenticate,async(req,res)=>{
     const userId=req.user.Id;
     const userRole=req.user.role;
     try{

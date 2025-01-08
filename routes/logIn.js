@@ -28,7 +28,7 @@ router.post('/', async (req, res) => {
                 }
                 else {
                     const studentFaculty = await connectionPromise.query(`SELECT Faculty FROM students WHERE StudentId=${Id}`)
-                    const accessToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '500s' })
+                    const accessToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1000s' })
                     const refreshToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
                     res.status(200).send({ accessToken, refreshToken });
                 }
@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
             }
             else {
                 const [staffDepartment] = await connectionPromise.query(`select Department from staff where Id='${staffId[0].Id}'`)
-                const accessToken = token.sign({ "Id": staffId[0].Id, "Department": staffDepartment[0].Department, "role": "staff" }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '500s' })
+                const accessToken = token.sign({ "Id": staffId[0].Id, "Department": staffDepartment[0].Department, "role": "staff" }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1000s' })
                 const refreshToken = token.sign({ "Id": staffId[0].Id, "Department": staffDepartment[0].Department, "role": "staff" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
                 res.status(200).send({ accessToken, refreshToken });
             }

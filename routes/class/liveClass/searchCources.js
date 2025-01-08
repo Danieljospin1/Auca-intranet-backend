@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../../../Authentication/authentication');
+const {Authenticate} = require('../../../Authentication/authentication');
 const connectionPromise = require('../../../database & models/databaseConnection');
 
-router.get('/',auth,async(req,res) =>{
+router.get('/',Authenticate,async(req,res) =>{
     const lecturerId = req.user.Id;
     try {
         const [courseList] = await connectionPromise.query(

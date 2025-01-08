@@ -5,7 +5,7 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
-const auth = require('../../../Authentication/authentication')
+const {Authenticate} = require('../../../Authentication/authentication')
 
 // storing images on server desktop
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
 })
 const upload = multer({ storage: storage });
 
-router.post('/', upload.single('post'), auth, async (req, res) => {
+router.post('/', upload.single('post'), Authenticate, async (req, res) => {
     const file = req.file;
 
     const { description, audience } = req.body;
@@ -70,7 +70,7 @@ router.post('/', upload.single('post'), auth, async (req, res) => {
 })
 
 
-router.get('/', auth, async (req, res) => {
+router.get('/', Authenticate, async (req, res) => {
     const studentFaculty = req.user.Faculty
     const id = req.user.Id
     const userRole = req.user.role
@@ -145,7 +145,7 @@ ORDER BY
         }
     }
 })
-router.delete('/', auth, async (req, res) => {
+router.delete('/', Authenticate, async (req, res) => {
     const Id = req.body.Id
     try {
         await connectionPromise.query(`delete from posts where Id=${Id}`).then(

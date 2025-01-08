@@ -1,12 +1,12 @@
 const express=require('express');
 const router=express.Router();
-const auth=require('../Authentication/authentication')
+const {Authenticate}=require('../Authentication/authentication')
 const connectionPromise=require('../database & models/databaseConnection');
 const path = require('path')
 const os=require('os')
 const multer=require('multer')
 
-router.get('/',auth,async(req,res)=>{
+router.get('/',Authenticate,async(req,res)=>{
     const userID=req.user.Id;
     try{
         const [staffProfile]=await connectionPromise.query(`select * from staff where Id=?`,[userID]);
@@ -38,7 +38,7 @@ const storage = multer.diskStorage({
 })
 const upload = multer({ storage: storage });
 
-router.post('/',upload.single('profile'),auth,async(req,res)=>{
+router.post('/',upload.single('profile'),Authenticate,async(req,res)=>{
     const userId = req.user.Id;
     const profile = req.file;
     const profilePath = profile.path;

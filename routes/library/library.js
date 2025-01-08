@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const auth = require('../../Authentication/authentication')
+const {Authenticate} = require('../../Authentication/authentication')
 const connectionPromise = require('../../database & models/databaseConnection')
 const multer = require('multer')
 const path = require('path')
@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
 })
 const uploadBook = multer({ storage: storage })
 
-router.post('/', uploadBook.array('files', 3), auth, async (req, res) => {
+router.post('/', uploadBook.array('files', 3), Authenticate, async (req, res) => {
     const { title, size, level, faculty, department, } = req.body;
     const thumbnail = req.files[0]
    
@@ -81,7 +81,7 @@ router.post('/', uploadBook.array('files', 3), auth, async (req, res) => {
     
     })
     
-router.get('/', auth, async (req, res) => {
+router.get('/', Authenticate, async (req, res) => {
     const user = req.user.Id
     const studentFaculty = req.user.Faculty
 

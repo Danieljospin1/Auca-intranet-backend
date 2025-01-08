@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../Authentication/authentication')
+const {Authenticate} = require('../Authentication/authentication')
 const connectionPromise = require('../database & models/databaseConnection');
 const multer = require('multer')
 const fs = require('fs')
 const os = require('os')
 const path = require('path');
-const { error } = require('console');
 
-router.get('/', auth, async (req, res) => {
+
+router.get('/', Authenticate, async (req, res) => {
     const userID = req.user.Id;
     try {
         const [userProfile] = await connectionPromise.query(`select * from students where StudentId=?`,[userID]);
@@ -22,7 +22,7 @@ router.get('/', auth, async (req, res) => {
 
 
 })
-router.patch('/', auth, async (req, res) => {
+router.patch('/', Authenticate, async (req, res) => {
     const Phone = req.body.phone;
     const Email = req.body.email;
     const StudentId = req.user.Id;
@@ -70,7 +70,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 
-router.post('/', upload.single('profile'), auth, async (req, res) => {
+router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     const StudentId = req.user.Id;
     const profile = req.file;
     const profilePath = profile.path;

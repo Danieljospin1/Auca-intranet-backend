@@ -1,9 +1,11 @@
 const express=require('express')
 const app=express()
 const port= 3000
+const socketIo=require('socket.io')
+const http=require('http')
+const socketRoutes=require('./socketsWrapper')
 const bodyParser=require('body-parser')
 const login=require('./routes/logIn')
-const db=require('./database & models/databaseConnection')
 const StudentMarks=require('./routes/home/private/studentMarks')
 const studentProfile=require('./routes/studentProfile')
 const staffProfile=require('./routes/staffProfile')
@@ -17,7 +19,14 @@ const postsFileHandler=require('./routes/FileHandlers/postImages')
 const postReactions=require('./routes/home/public/postReactions')
 const liveclasses=require('./routes/class/liveClass/liveClasses')
 const LecturerCourseSelection=require('./routes/class/liveClass/searchCources')
+const {socketAuthenticate}=require('./Authentication/authentication')
 
+
+// websockets configuration
+const socketServer=http.createServer(app)
+const io=socketIo(socketServer)
+io.use(socketAuthenticate)//authentication middleware
+socketRoutes(io)
 
 
 
@@ -44,7 +53,7 @@ app.use('/home/posts',postsFileHandler)
 
 const Start=()=>{
     try{
-        app.listen(port,()=>{
+        socketServer.listen(port,()=>{
           console.log(`server is listerning to ${port} ...`)
       })
  
