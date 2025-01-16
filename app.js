@@ -20,6 +20,9 @@ const postReactions=require('./routes/home/public/postReactions')
 const liveclasses=require('./routes/class/liveClass/liveClasses')
 const LecturerCourseSelection=require('./routes/class/liveClass/searchCources')
 const {socketAuthenticate}=require('./Authentication/authentication')
+const GroupChatAddition=require('./routes/class/classGroupsChat/groupChatAddition')
+const classWorks=require('./routes/class/classWorks/classWorks')
+const classWorksFileHandler=require('./routes/FileHandlers/classWorksFile')
 
 
 // websockets configuration
@@ -41,10 +44,14 @@ app.use('/home/studentPerformance',StudentMarks)
 app.use('/class/classGroups',classGroups)
 app.use('/class/liveClass',liveclasses)
 app.use('/class/lecturerCourseSelection',LecturerCourseSelection)
+app.use('/class/groupChat',GroupChatAddition)
+app.use('/class/classWorks',classWorks)
+app.use('/class/classWorks',classWorksFileHandler)
 app.use('/library',library)
 app.use('/student/imgProfile',studentProfileHandler)
 app.use('/staff/imgProfile',staffProfileHandler)
 app.use('/home/posts',postsFileHandler)
+
 
 
 

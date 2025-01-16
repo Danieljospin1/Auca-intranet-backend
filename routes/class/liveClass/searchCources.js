@@ -11,8 +11,8 @@ router.get('/',Authenticate,async(req,res) =>{
                   c.Name AS CourseName, 
                   cg.GroupName 
                    
-           FROM LecturerCources l
-           LEFT JOIN courseGroups cg ON l.CourseGroupId = cg.Id
+           FROM LecturerCourses l
+           LEFT JOIN courseGroups cg ON l.ClassId = cg.Id
            LEFT JOIN courses c ON cg.CourseId = c.CourseId
            WHERE l.LecturerId = ?;`, 
           [lecturerId]
