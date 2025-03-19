@@ -30,6 +30,7 @@ const socketServer=http.createServer(app)
 const io=socketIo(socketServer)
 io.use(socketAuthenticate)//authentication middleware
 socketRoutes(io)
+app.set('io',io); //setting io instance in express to be able to use it in express based routes
 
 
 

@@ -28,6 +28,15 @@ module.exports = (io) => {
             if (checkUserStatus.length == 0) {
                 await connectionPromise.query(`insert into userstatus (UserId,UserType,Status) values (?,?,?)`, [userId, userRole, 'online']);
                 console.log('user status created successfully...')
+                //querying class meta data a user joined....
+
+                const [classMetadata]=await connectionPromise.query(`
+                    select r.Id as roomId,c.CourseId,c.Name,c.Code,g.GroupName,cl.ClassAvatar,Cl.ClassStatus,r.MemberRole from 
+                    courses c join courseGroups g on c.CourseId=g.Id 
+                    join classes cl on g.Id=cl.CourseGroupId 
+                    join roommembership r on cl.Id=r.ClassId where r.MemberId=?`,[userId]);
+                socket.emit('newClasses',classMetadata)
+                console.log(classMetadata)
             }
             else {
                 null
