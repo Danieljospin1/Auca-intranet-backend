@@ -41,11 +41,14 @@ router.post('/', upload.single('post'), Authenticate, async (req, res) => {
             
             // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-            await connectionPromise.query(`insert into posts(CreatorId,ImageUrl,Description,Audience,PostedBy) values (?,?,?,?,?)`,[postedById,postImageUrl,description,audience,role]).then(() => {
+            const insert=await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`,[postedById,description,role]).then(async() => {
+                
                 res.status(200).json({ message: `Post uploaded successfully...` })
                 console.log(typeof (file))
 
             })
+            const PostId=insert.insertId;
+            await connectionPromise.query(`insert into postaudience(PostId,AudienceType,AudienceValue) values(?,?,?)`,[PostId,])
         }
         catch {
             (err) => {
@@ -87,7 +90,7 @@ router.get('/', Authenticate, async (req, res) => {
     CASE 
         WHEN s.StudentId IS NOT NULL THEN s.Fname 
         ELSE st.Fname 
-    END AS Fname,
+    END AS Fname,   
     
     CASE 
         WHEN s.StudentId IS NOT NULL THEN s.Lname 
@@ -104,7 +107,7 @@ router.get('/', Authenticate, async (req, res) => {
         ELSE st.Role 
     END AS Role,
     
-    p.ImageUrl,
+    
     p.Description,
     p.Audience,
     p.Timestamp,
@@ -130,7 +133,7 @@ WHERE
 GROUP BY 
     p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
     st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-    p.CreatorId, p.ImageUrl, p.Description, p.Audience, p.Timestamp
+    p.CreatorId, p.Description, p.Audience, p.Timestamp
 ORDER BY 
     p.Timestamp DESC;
 
