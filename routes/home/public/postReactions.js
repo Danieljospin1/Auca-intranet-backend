@@ -4,7 +4,7 @@ const connectionPromise = require('../../../database & models/databaseConnection
 const {Authenticate} = require('../../../Authentication/authentication')
 
 router.post('/', Authenticate, async (req, res) => {
-    const postId = req.body.PostId;
+    const postId = req.body.Id;
     const reactionType = req.body.ReactionType;
     const userId = req.user.Id;
     const userRole = req.user.role;
@@ -30,7 +30,7 @@ router.post('/', Authenticate, async (req, res) => {
 })
 
 router.delete('/', Authenticate, async (req, res) => {
-    const postId = req.body.PostId;
+    const postId = req.body.Id;
     const userId = req.user.Id;
 
     try {
