@@ -11,7 +11,6 @@ const studentProfile=require('./routes/studentProfile')
 const staffProfile=require('./routes/staffProfile')
 const posts=require('./routes/home/public/posts')
 const comments=require('./routes/home/public/comments')
-const classGroups=require('./routes/class/classGroupsChat/groupChats')
 const library=require('./routes/library/library')
 const studentProfileHandler=require('./routes/FileHandlers/studentProfiles')
 const staffProfileHandler=require('./routes/FileHandlers/staffProfiles')
@@ -23,6 +22,7 @@ const {socketAuthenticate}=require('./Authentication/authentication')
 const GroupChatAddition=require('./routes/class/classGroupsChat/groupChatAddition')
 const classWorks=require('./routes/class/classWorks/classWorks')
 const classWorksFileHandler=require('./routes/FileHandlers/classWorksFile')
+const notification=require('./routes/notifications/notifications')
 
 
 // websockets configuration
@@ -42,7 +42,6 @@ app.use('/home/posts',posts)
 app.use('/home/posts/reactions',postReactions)
 app.use('/home/posts/comment',comments)
 app.use('/home/studentPerformance',StudentMarks)
-app.use('/class/classGroups',classGroups)
 app.use('/class/liveClass',liveclasses)
 app.use('/class/lecturerCourseSelection',LecturerCourseSelection)
 app.use('/class/groupChat',GroupChatAddition)
@@ -52,6 +51,7 @@ app.use('/library',library)
 app.use('/student/imgProfile',studentProfileHandler)
 app.use('/staff/imgProfile',staffProfileHandler)
 app.use('/home/posts',postsFileHandler)
+app.use('/notifications',notification)
 
 
 
