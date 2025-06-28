@@ -19,7 +19,7 @@ module.exports = async(io) => {
 
         //finding the class groups the user belongs to.
         try {
-            const [rooms] = await connectionPromise.query('SELECT ClassId FROM roommembership WHERE MemberId=?', [userId]);
+            const [rooms] = await connectionPromise.query('SELECT ClassId FROM roommembership WHERE MemberId=? and IsActive=?', [userId,true]);
             rooms.forEach(({ ClassId }) => {
                 socket.join(ClassId);
                 socket.emit('joinRooms', `you ${userId} have joined room ${ClassId}`)

@@ -15,7 +15,7 @@ router.post('/:classId/:memberId/', async (req, res) => {
 
 
     if (classId && memberId) {
-        const [studentClassMembershipCheck] = await connectionPromise.query('select * from roommembership where ClassId=? and MemberId=?', [classId, memberId]);
+        const [studentClassMembershipCheck] = await connectionPromise.query('select * from roommembership where ClassId=? and MemberId=? and IsActive=?', [classId, memberId,true]);
         if (studentClassMembershipCheck.length == 0) {
             await connectionPromise.query(`insert into roommembership(ClassId,MemberId,MemberRole) values(?,?,?)`, [classId, memberId, 'student']);
             await connectionPromise.query(`insert into messages (Text,ClassId,MessageType) values(?,?,?)`, [`student with Id ${memberId} joined this class `, classId, 'system']);
@@ -29,7 +29,7 @@ router.post('/:classId/:memberId/', async (req, res) => {
                                     select r.Id as roomId,c.CourseId,c.Name,c.Code,g.GroupName,cl.ClassAvatar,Cl.ClassStatus,r.MemberRole from 
                                     courses c join courseGroups g on c.CourseId=g.Id 
                                     join classes cl on g.Id=cl.CourseGroupId 
-                                    join roommembership r on cl.Id=r.ClassId where r.MemberId=? AND c.CourseId=?`, [memberId,classId]);
+                                    join roommembership r on cl.Id=r.ClassId where r.MemberId=? AND c.CourseId=? and r.IsActive=?`, [memberId,classId,true]);
                 userSocket.emit('newClasses', classMetadata)
                 
 
@@ -72,6 +72,7 @@ router.delete('/', Authenticate, async (req, res) => {
     const memberId = req.user.Id;
     const userRole = req.user.role;
     const io = req.app.get('io');//returning io instance setted in main file(app.js)
+    const userSocket = get(Number(memberId));
 
     if (!classId || !memberId) {
         return res.status(400).json({ error: "Enter required data" });
@@ -79,16 +80,19 @@ router.delete('/', Authenticate, async (req, res) => {
 
     try {
         await connectionPromise.query(
-            `DELETE FROM roommembership WHERE ClassId = ? AND MemberId = ?`,
-            [classId, memberId]
+            `update roommembership set IsActive=?,LeftAt=NOW() WHERE ClassId = ? AND MemberId = ?`,
+            [false,classId, memberId]
         );
+        
         if (userRole == 'student') {
             io.to(classId).emit('classLefting', `student with Id ${memberId} has left the class group chat`)
         }
         else {
             io.to(classId).emit('classLefting', 'class lecturer has left the class group chat');
         }
+        userSocket?userSocket.emit("ClassLeave",{"ClassId":classId,"IsActive":false}):null 
         res.json({ message: "You have been removed from the room..." });
+        
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "An error occurred while removing the member" });
