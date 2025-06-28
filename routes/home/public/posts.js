@@ -156,6 +156,7 @@ router.get('/', Authenticate, async (req, res) => {
     p.Timestamp,
     f.FileType,
     f.ThumbnailUrl,
+    f.FullUrl,
     f.FileSize,
     pa.AudienceType,
     pa.AudienceValue,
@@ -187,6 +188,7 @@ GROUP BY
     st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
     p.CreatorId, p.Description, p.Timestamp,f.FileType,
     f.ThumbnailUrl,
+    f.FullUrl,
     f.FileSize,
     pa.AudienceType,
     pa.AudienceValue

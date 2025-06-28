@@ -23,6 +23,7 @@ const GroupChatAddition=require('./routes/class/classGroupsChat/groupChatAdditio
 const classWorks=require('./routes/class/classWorks/classWorks')
 const classWorksFileHandler=require('./routes/FileHandlers/classWorksFile')
 const notification=require('./routes/notifications/notifications')
+const postImgThumbnail=require('./routes/FileHandlers/postThumbnail')
 
 
 // websockets configuration
@@ -51,6 +52,7 @@ app.use('/library',library)
 app.use('/student/imgProfile',studentProfileHandler)
 app.use('/staff/imgProfile',staffProfileHandler)
 app.use('/home/posts',postsFileHandler)
+app.use('/home/posts',postImgThumbnail)
 app.use('/notifications',notification)
 
 
