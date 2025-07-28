@@ -7,6 +7,9 @@ const fs = require('fs')
 const os = require('os')
 const fileSizeFormat = require('../../../utils/fileSizeFormat');
 const { Authenticate } = require('../../../Authentication/authentication')
+const { get } = require('../../../socketDirectory')
+const getPostById = require('../../../utils/getPosts');
+
 
 // storing images on server desktop
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
@@ -29,16 +32,19 @@ const storage = multer.diskStorage({
     filename: function (req, file, cb) {
         const fileName = Date.now() + path.extname(file.originalname)
         cb(null, fileName)
+
     }
 })
 const upload = multer({ storage: storage });
 
 router.post('/', upload.fields([
     { name: "orgPostFile", maxCount: 1 },
+
     { name: "postFileThumbnail", maxCount: 1 }
 ]), Authenticate, async (req, res) => {
     const PostFile = req.files?.orgPostFile?.[0]?.path;
     const PostFileThumbnail = req.files?.postFileThumbnail?.[0]?.path;
+    console.log(PostFile)
 
 
 
@@ -46,6 +52,9 @@ router.post('/', upload.fields([
     const { description, audience } = req.body;
     const postedById = req.user.Id;
     const role = req.user.role;
+    const io = req.app.get('io');
+
+    
 
 
 
@@ -57,70 +66,85 @@ router.post('/', upload.fields([
         const postThumbnailUrl = `http://localhost:3000/home/posts/postImg/thbnl/${path.basename(PostFileThumbnail)}`
 
 
+
         try {
 
-            if (description) {
-                // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
-                // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
-                const PostId = insert.insertId;
-                if (audience) {
-                    const audienceData = JSON.parse(audience);
-                    audienceData.forEach(async (item) => {
-                        await connectionPromise.query(`insert into postaudience(PostId,AudienceType,AudienceValue) values (?,?,?)`, [PostId, item.type, item.value]);
-                    })
+
+            // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
+            // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
+            const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
+            const PostId = insert.insertId;
+
+
+
+            await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, postThumbnailUrl, postImageUrl, fileMimeType, fileSize]).then(
+                res.status(200).json({ message: `Post created successfully...`, postId: PostId })
+            )
+            const post = await getPostById(PostId);
+            if (post) {
+                if (audience == 'all') {
+                    io.to('all').emit('newPost', post);
                 }
-                await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, postThumbnailUrl, postImageUrl, fileMimeType, fileSize]).then(() => {
-
-                    return res.status(200).json({ message: `Post uploaded successfully...` })
-
-
-                });
+                if (audience == 'staff') {
+                    io.to('staff').emit('newPost', post);
+                }
+                if (audience == 'students') {
+                    io.to('students').emit('newPost', post);
+                }
             }
-
-
-
         }
         catch (err) {
             console.log(err)
         }
     }
-    else {
+    else{
         try {
 
-            if (description) {
-                // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
-                // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
-                const PostId = insert.insertId;
-                if (audience) {
-                    const audienceData = JSON.parse(audience);
-
-                    audienceData.forEach(async (item) => {
-                        await connectionPromise.query(`insert into postaudience(PostId,AudienceType,AudienceValue) values (?,?,?)`, [PostId, item.type, item.value]);
-
-                    })
-                    return res.status(200).json({ message: `Post uploaded successfully...` })
+        if (description && audience) {
+            console.log(audience)
+            // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
+            // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
+            const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]).then(
+                res.status(200).json({ message: `Post created successfully...`})
+            )
+            const PostId = insert.insertId;
+            // refetching the post to emit it to the socket
+            const post = await getPostById(PostId);
+            if (post) {
+                if (audience == 'all') {
+                    io.to('all').emit('newPost', post);
                 }
-
+                if (audience == 'staff') {
+                    io.to('staff').emit('newPost', post);
+                }
+                if (audience == 'students') {
+                    io.to('students').emit('newPost', post);
+                }
             }
-
-
 
         }
-        catch {
-            (err) => {
-                console.log(err);
-            }
+        else {
+            return res.status(400).json({ message: 'Please provide all required fields.' });
+        }
+
+
+
+    }
+
+    catch {
+        (err) => {
+            console.log(err);
         }
     }
+
+    }
+
 })
 
 
 router.get('/', Authenticate, async (req, res) => {
-    const studentFaculty = req.user.Faculty
     const id = req.user.Id
-    const userRole = req.user.role
+    const userRole = req.user.role == 'staff' ? 'staff' : 'students';
     try {
         const [posts] = await connectionPromise.query(`
             SELECT 
@@ -158,8 +182,7 @@ router.get('/', Authenticate, async (req, res) => {
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
-    pa.AudienceType,
-    pa.AudienceValue,
+    p.Audience,
 
 
     -- Subqueries for counting interactions
@@ -179,10 +202,8 @@ LEFT JOIN
     staff st ON p.CreatorId = st.Id
 LEFT JOIN 
     postfiles f on p.Id=f.PostId
-LEFT JOIN 
-    postaudience pa on p.Id=pa.PostId
 WHERE 
-    pa.AudienceType =? OR pa.AudienceType = 'ALL'
+    p.Audience =? OR p.Audience = 'all'
 GROUP BY 
     p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
     st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
@@ -190,13 +211,12 @@ GROUP BY
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
-    pa.AudienceType,
-    pa.AudienceValue
+    p.Audience
 ORDER BY 
     p.Timestamp DESC;
 
 
-`, [studentFaculty])
+`, [userRole])
         res.status(200).json(posts)
     }
     catch (err) {

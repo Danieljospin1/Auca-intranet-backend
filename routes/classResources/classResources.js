@@ -6,12 +6,13 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs');
 const os = require('os')
+const fileSizeFormat=require('../../utils/fileSizeFormat')
 
 
 // general storage locations
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
 const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const libraryFolderLocation = path.join(uploadFolderPath, 'library')
+const libraryFolderLocation = path.join(uploadFolderPath, 'classResources')
 // storage location for book thumbnails
 const thumbnailStorageLocation = path.join(libraryFolderLocation, 'bookThumbnails')
 // storage location for book files
@@ -35,34 +36,31 @@ const storage = multer.diskStorage({
 })
 const uploadBook = multer({ storage: storage })
 
-router.post('/', uploadBook.array('files', 3), Authenticate, async (req, res) => {
-    const { title, size, level, faculty, department, } = req.body;
-    const thumbnail = req.files[0]
-   
-    const BookFile = req.files[1]
-    
+router.post('/', uploadBook.single('resourceFile'), Authenticate, async (req, res) => {
+    const { ClassId,title,Description } = req.body;
+    const resourceFile=req.file;
+    const fileSize=fileSizeFormat(resourceFile.size)
+    const mimeType=resourceFile.mimetype;
+    const fileType=path.extname(resourceFile.path);
+    const fileUrl=`http://localhost:3000/class/classResources/flname/${resourceFile.originalname}`;
     const userRole = req.user.role;
-    const user =req.user.Id;
+    const userId =req.user.Id;
+    const io=req.app.get('io');
 
     // adding back-slashes in the file path
     // const slashedFile1 = file1.replace(/\\/g, '\\\\');
     // const slashedFile2 = file2.replace(/\\/g, '\\\\');
     // implementing security door to ensure that only staff can upload books 
-    if(thumbnail && BookFile){
-        const file1 = thumbnail.path
-        const file2 = BookFile.path
-        const thumbnailUrl=`http://localhost:3000/`
-        if (userRole=='staff') {
-            try {
-                await connectionPromise.query(`insert into library(Title,Size,Level,Faculty,Department,PostedById,ImageUrl,BookFileLocation) 
-                values(?,?,?,?,?,?,?,?)`,[title,size,level,faculty,department,user,file1,file2]).then((results, error) => {
-                    if (error) {
-                        throw error
-                    }
-                    res.status(200).json({"message":"Book uploded successfully"})
-    
-    
-                })
+    try {
+                await connectionPromise.query(`insert into classresources(ClassId,LecturerId,Title,Description,FileUrl,FileType,MimeType,FileSize) 
+                values(?,?,?,?,?,?,?,?)`,[ClassId,userId,title,Description,fileUrl,fileType,mimeType,fileSize])
+                const notificationTitle='New class resource shared'
+                const notificationMessage=`Lecturer shared new class resource -${title}-`
+                const notificationPost=await connectionPromise.query(`insert into notifications(Title,Message,Type,SenderId) values(?,?,?,?)`,[notificationTitle,notificationMessage,'system',userId]);
+                const notificationPostId=notificationPost.insertId;
+                await connectionPromise.query('insert into notificationtargets(NotificationId,AudienceType,AudienceValue) values(?,?,?)',[notificationPostId,'class',ClassId])
+                io.to(ClassId).emit("newNotification",notificationMessage);
+                res.status(200).json({"message":"Class resource uploded successfully"});
     
             }
             catch {
@@ -70,14 +68,6 @@ router.post('/', uploadBook.array('files', 3), Authenticate, async (req, res) =>
                     console.log(err)
                 }
             }
-        }
-        else {
-            res.status(403).json({ "message": "opps!!!! it seams like you are not eligible to post your book in auca online library" })
-        }
-    }
-    else{
-        
-    }
     
     })
     

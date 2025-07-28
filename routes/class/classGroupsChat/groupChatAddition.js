@@ -85,7 +85,7 @@ router.delete('/', Authenticate, async (req, res) => {
         );
         
         if (userRole == 'student') {
-            io.to(classId).emit('classLefting', `student with Id ${memberId} has left the class group chat`)
+            io.to(classId).emit('classLefting', `student with Id ${memberId} has left the class group chat ${classId}`);
         }
         else {
             io.to(classId).emit('classLefting', 'class lecturer has left the class group chat');

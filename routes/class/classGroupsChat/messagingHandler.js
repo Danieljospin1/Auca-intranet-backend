@@ -30,20 +30,25 @@ module.exports = async(io) => {
             })
             //checking for new classes user joined while offline
             const [lastSeen]=await connectionPromise.query(`select Timestamp from userstatus where UserId=?`,[userId]);
-            const [roomJoinDates]=await connectionPromise.query(`select JoiningDate from roommembership where MemberId=?`,[userId]);
-            roomJoinDates.forEach(async(roomJoinDate)=>{
+            const [roomJoinDates]=await connectionPromise.query(`select JoiningDate from roommembership where MemberId=? and IsActive=?`,[userId,true]);
+            if(roomJoinDates.length !=0){
+                roomJoinDates.forEach(async(roomJoinDate)=>{
                 console.log(lastSeen[0].Timestamp)
                 if(lastSeen[0].Timestamp < roomJoinDate.JoiningDate){
                     const [classMetadata] = await connectionPromise.query(`
                                                         select r.Id as roomId,c.CourseId,c.Name,c.Code,g.GroupName,cl.ClassAvatar,Cl.ClassStatus,r.MemberRole from 
                                                         courses c join courseGroups g on c.CourseId=g.Id 
                                                         join classes cl on g.Id=cl.CourseGroupId 
-                                                        join roommembership r on cl.Id=r.ClassId where r.MemberId=?`, [userId]);
+                                                        join roommembership r on cl.Id=r.ClassId where r.MemberId=? and r.IsActive=? and r.JoiningDate=?`, [userId,true,roomJoinDate.JoiningDate]);
                     socket.emit('newClasses',classMetadata);
                 }
                 
             })
 
+            }
+            else{
+                null
+            }
             //updating user status to be able to return messages sent when the user was offline
             const [checkUserStatus] = await connectionPromise.query(`select * from userstatus where UserId=?`, [userId])
             console.log(checkUserStatus)
@@ -78,7 +83,19 @@ module.exports = async(io) => {
 
             await connectionPromise.query(`update userstatus set Status=? where UserId=?`, ['online', userId])
                 console.log('user status updated successfully...')
+
             
+            // joining announcement rooms
+            socket.join('all') 
+
+            if(userRole=='staff'){
+                socket.join('staff')
+                console.log('user is staff, joining staff room')
+            }
+            else{
+                socket.join('students')
+                console.log('user is student, joining student room')
+            }
 
 
         }
