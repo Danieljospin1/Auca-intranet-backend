@@ -27,7 +27,7 @@ router.post('/', async (req, res) => {
                     res.status(401).json("invalid user credentials")
                 }
                 else {
-                    const studentFaculty = await connectionPromise.query(`SELECT Faculty FROM students WHERE StudentId=${Id}`)
+                    const studentFaculty = await connectionPromise.query(`SELECT Faculty FROM students WHERE StudentId=?`,[Id])
                     const accessToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.ACCESS_TOKEN_SECRET, {})
                     const refreshToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
                     res.status(200).send({ accessToken, refreshToken });
