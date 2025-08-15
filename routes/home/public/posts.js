@@ -74,11 +74,14 @@ router.post('/', upload.fields([
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
             const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
             const PostId = insert.insertId;
+            console.log({"this":PostId})
+            console.log(fileType, postImageUrl, postThumbnailUrl, fileMimeType, fileSize)
 
 
 
             await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, postThumbnailUrl, postImageUrl, fileMimeType, fileSize]).then(
                 res.status(200).json({ message: `Post created successfully...`, postId: PostId })
+                
             )
             const post = await getPostById(PostId);
             if (post) {

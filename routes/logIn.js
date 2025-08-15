@@ -27,10 +27,12 @@ router.post('/', async (req, res) => {
                     res.status(401).json("invalid user credentials")
                 }
                 else {
+                    const [studentProfile]= await connectionPromise.query(`select StudentId,Fname,Lname,Email,Phone,Faculty,Department,ProfileUrl from students where StudentId=?`,[Id]);
                     const studentFaculty = await connectionPromise.query(`SELECT Faculty FROM students WHERE StudentId=?`,[Id])
                     const accessToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.ACCESS_TOKEN_SECRET, {})
                     const refreshToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty, "role": "student" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
-                    res.status(200).send({ accessToken, refreshToken });
+                    res.status(200).send({ accessToken, refreshToken,studentProfile });
+                    
                 }
 
             }
@@ -44,10 +46,11 @@ router.post('/', async (req, res) => {
                 res.status(401).json("invalid user credentials")
             }
             else {
+                const [staffProfile] = await connectionPromise.query(`select Id,Fname,Lname,Email,Department,Role,ProfileUrl from staff where Id=?`,[staffId[0].Id])
                 const [staffDepartment] = await connectionPromise.query(`select Department from staff where Id='${staffId[0].Id}'`)
                 const accessToken = token.sign({ "Id": staffId[0].Id, "Department": staffDepartment[0].Department, "role": "staff" }, process.env.ACCESS_TOKEN_SECRET, { })
                 const refreshToken = token.sign({ "Id": staffId[0].Id, "Department": staffDepartment[0].Department, "role": "staff" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
-                res.status(200).send({ accessToken, refreshToken });
+                res.status(200).send({ accessToken, refreshToken,staffProfile });
             }
         }
         else {

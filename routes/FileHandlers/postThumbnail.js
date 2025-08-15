@@ -7,8 +7,8 @@ router.get('/postImg/thbnl/:fileName',(req,res)=>{
     const fileName=req.params.fileName
     const desktopFolderPath = path.join(os.homedir(), 'Desktop');
     const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-    const postsFolder=path.join(uploadFolderPath,'posts')
-    const thumbNailFolderLocation = path.join(postsFolder, 'thumbnails');
+    const thumbNailFolderLocation=path.join(uploadFolderPath,'thumbnails')
+    
     const filePath=path.join(thumbNailFolderLocation,fileName)
     res.sendFile(filePath, (err) => {
         if (err) {

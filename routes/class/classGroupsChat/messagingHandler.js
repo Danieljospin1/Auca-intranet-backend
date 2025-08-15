@@ -1,140 +1,241 @@
-const roomJoiningRouter = require('./groupChatAddition')
-const connectionPromise = require('../../../database & models/databaseConnection')
+// messagingHandler.js
+const roomJoiningRouter = require('./groupChatAddition');
+const connectionPromise = require('../../../database & models/databaseConnection');
 const moment = require('moment');
-const {set,remove} = require( '../../../socketDirectory');
+const { set: setSocketDir, remove: removeSocketDir } = require('../../../socketDirectory');
 
-
-module.exports = async(io) => {
+module.exports = async (io) => {
     io.on('connection', async (socket) => {
-
-        const date = new Date()
-        console.log(`a user ${socket.user.Id} is connected at ${date.toUTCString()}`);
-        const userId = socket.user.Id
-        const userRole = socket.user.role
-
-        //saving user socket in socket directory
-        set(userId,socket);
-        
-
-
-        //finding the class groups the user belongs to.
+        // Top-level try/catch so unhandled errors inside connection handler don't crash the process
         try {
-            const [rooms] = await connectionPromise.query('SELECT ClassId FROM roommembership WHERE MemberId=? and IsActive=?', [userId,true]);
-            rooms.forEach(({ ClassId }) => {
-                socket.join(ClassId);
-                socket.emit('joinRooms', `you ${userId} have joined room ${ClassId}`)
-                
-                
-
-
-            })
-            //checking for new classes user joined while offline
-            const [lastSeen]=await connectionPromise.query(`select Timestamp from userstatus where UserId=?`,[userId]);
-            const [roomJoinDates]=await connectionPromise.query(`select JoiningDate from roommembership where MemberId=? and IsActive=?`,[userId,true]);
-            if(roomJoinDates.length !=0){
-                roomJoinDates.forEach(async(roomJoinDate)=>{
-                console.log(lastSeen[0].Timestamp)
-                if(lastSeen[0].Timestamp < roomJoinDate.JoiningDate){
-                    const [classMetadata] = await connectionPromise.query(`
-                                                        select r.Id as roomId,c.CourseId,c.Name,c.Code,g.GroupName,cl.ClassAvatar,Cl.ClassStatus,r.MemberRole from 
-                                                        courses c join courseGroups g on c.CourseId=g.Id 
-                                                        join classes cl on g.Id=cl.CourseGroupId 
-                                                        join roommembership r on cl.Id=r.ClassId where r.MemberId=? and r.IsActive=? and r.JoiningDate=?`, [userId,true,roomJoinDate.JoiningDate]);
-                    socket.emit('newClasses',classMetadata);
-                }
-                
-            })
-
-            }
-            else{
-                null
-            }
-            //updating user status to be able to return messages sent when the user was offline
-            const [checkUserStatus] = await connectionPromise.query(`select * from userstatus where UserId=?`, [userId])
-            console.log(checkUserStatus)
-            if (checkUserStatus.length == 0) {
-                await connectionPromise.query(`insert into userstatus (UserId,UserType,Status) values (?,?,?)`, [userId, userRole, 'online']);
-                console.log('user status created successfully...')
-                
-            }
-            else {
-                null
-            }
-            //to search for time user was online
-            const [utcUserLastSeen] = await connectionPromise.query(`select Timestamp from userstatus where UserId=?`, [userId])
-            const userLastSeen = moment.utc(utcUserLastSeen[0].Timestamp).local().format("YYYY-MM-DD HH:mm:ss");
-
-
-            //fetching all messages from database
-            const placeholders = rooms.map(() => '?').join(','); // Create placeholders like ?, ?, ?
-            const query = `SELECT m.Id,m.SenderId,case when m.SenderType='staff' then st.Lname else s.Lname end as Lname,
-            case when m.SenderType='staff' then st.ProfileUrl else s.ProfileUrl end as ProfileImage,
-            m.SenderType,m.Text,m.ClassId,m.Timestamp FROM messages m
-            left join staff st on m.SenderId=st.Id 
-            left join students s on m.SenderId=s.StudentId WHERE ClassId IN (${placeholders}) AND m.Timestamp>'${userLastSeen}' ORDER BY Timestamp`;
-
-            const roomsArray = rooms.map(item => item.ClassId); // this line will convert from [ { CourseGroupId: 1 }, { CourseGroupId: 2 } ] to [1,2] to access all messages from all rooms
-            
-
-            const [offlineGroupMessages] = await connectionPromise.query(query, roomsArray);
-            socket.emit('messages', offlineGroupMessages);
-            
-            // Process and emit messages to the client
-
-            await connectionPromise.query(`update userstatus set Status=? where UserId=?`, ['online', userId])
-                console.log('user status updated successfully...')
-
-            
-            // joining announcement rooms
-            socket.join('all') 
-
-            if(userRole=='staff'){
-                socket.join('staff')
-                console.log('user is staff, joining staff room')
-            }
-            else{
-                socket.join('students')
-                console.log('user is student, joining student room')
+            // Ensure socket.user exists (authentication middleware should set this)
+            if (!socket.user || !socket.user.Id) {
+                console.warn('Unauthenticated socket connected; disconnecting.');
+                try { socket.disconnect(true); } catch (e) { /* ignore */ }
+                return;
             }
 
+            const connectedAt = new Date();
+            const userId = socket.user.Id;
+            const userRole = socket.user.role;
+            console.log(`a user ${userId} is connected at ${connectedAt.toUTCString()}`);
 
-        }
-        
-
-
-        catch {
-            (err) => {
-                console.log(err);
-            }
-        }
-        
-        socket.on('roomMessage', async ({ room, message }) => {
+            // --- Remove any previous socket for this user (avoid duplicates) ---
             try {
-                await connectionPromise.query(
-                    'INSERT INTO messages(SenderId, SenderType, Text, ClassId) VALUES (?, ?, ?, ?)',
-                    [userId, userRole, message, room]
-                );
-                const [incomingMessage] = await connectionPromise.query(`SELECT m.Id,m.SenderId,case when m.SenderType='staff' then st.Lname else s.Lname end as Lname,
-            case when m.SenderType='staff' then st.ProfileUrl else s.ProfileUrl end as ProfileImage,
-            m.SenderType,m.Text,m.ClassId,m.Timestamp FROM messages m
-            left join staff st on m.SenderId=st.Id 
-            left join students s on m.SenderId=s.StudentId WHERE m.SenderId=? and m.ClassId=? order by m.Timestamp desc limit 1`, [userId, room]);
-                socket.to(room).emit('incomingMessage', incomingMessage);
-
-
-            } catch (error) {
-                console.log('database error:', error);
+                // io.of('/').sockets is a Map; iterate its values to get Socket instances
+                for (const s of io.of('/').sockets.values()) {
+                    if (s && s.user && s.user.Id === userId && s.id !== socket.id) {
+                        console.log(`[socket] Detected existing socket (${s.id}) for user ${userId}. Disconnecting old socket.`);
+                        try { s.disconnect(true); } catch (e) { console.warn('[socket] error disconnecting old socket', e); }
+                    }
+                }
+            } catch (err) {
+                console.warn('[socket] error checking existing sockets', err);
             }
-        });
 
-        socket.on('disconnect', async () => {
-            console.log(`a user ${socket.id} is disconnected`);
-            const userId = socket.user.Id
-            const userRole = socket.user.role
-            remove(userId);
-            await connectionPromise.query(`update userstatus set Status=? where UserId=?`, ['offline', userId])
-            console.log('user status updated successfully...')
+            // Save this socket in your directory
+            try {
+                setSocketDir(userId, socket);
+            } catch (err) {
+                console.warn('[socket] socketDirectory.set failed', err);
+            }
 
-        })
-    })
-}
+            // Helper: safe query wrapper with limited retries and backoff
+            const safeQuery = async (sql, params = [], opts = {}) => {
+                const maxRetries = typeof opts.retries === 'number' ? opts.retries : 3;
+                const baseDelay = typeof opts.baseDelay === 'number' ? opts.baseDelay : 300; // ms
+                let attempt = 0;
+
+                while (attempt < maxRetries) {
+                    try {
+                        const res = await connectionPromise.query(sql, params);
+                        return res; // [rows, fields]
+                    } catch (err) {
+                        attempt++;
+                        const msg = err && err.message ? err.message : String(err);
+                        console.error(`[DB] query error (attempt ${attempt}/${maxRetries}):`, msg);
+
+                        // If the error is connection refused, wait and retry a few times
+                        if (attempt >= maxRetries) {
+                            console.error('[DB] max retries reached, returning empty result');
+                            return [[], null];
+                        }
+
+                        // exponential backoff
+                        const wait = baseDelay * Math.pow(2, attempt - 1);
+                        await new Promise(res => setTimeout(res, wait));
+                    }
+                }
+
+                // Fallback: return empty result
+                return [[], null];
+            };
+
+            // --- find the rooms the user belongs to ---
+            const [roomsRows] = await safeQuery(
+                'SELECT ClassId FROM roommembership WHERE MemberId = ? AND IsActive = ?',
+                [userId, true]
+            );
+
+            const rooms = Array.isArray(roomsRows) ? roomsRows : [];
+
+            // Join the rooms (sequentially to avoid heavy parallel ops)
+            for (const row of rooms) {
+                const classId = row.ClassId;
+                try {
+                    // ensure classId is string when joining
+                    await socket.join(String(classId));
+                    try { socket.emit('joinRooms', `you ${userId} have joined room ${classId}`); } catch (e) {/* ignore */ }
+                } catch (err) {
+                    console.warn(`[socket] join room ${classId} failed for user ${userId}`, err);
+                }
+            }
+
+            // --- fetch lastSeen (if any) ---
+            const [lastSeenRows] = await safeQuery('SELECT Timestamp FROM userstatus WHERE UserId = ?', [userId]);
+            const lastSeenTimestamp = (Array.isArray(lastSeenRows) && lastSeenRows[0] && lastSeenRows[0].Timestamp)
+                ? lastSeenRows[0].Timestamp
+                : null;
+
+            // --- check for newly joined rooms since lastSeen ---
+            const [roomJoinDatesRows] = await safeQuery(
+                'SELECT JoiningDate FROM roommembership WHERE MemberId = ? AND IsActive = ?',
+                [userId, true]
+            );
+            const roomJoinDates = Array.isArray(roomJoinDatesRows) ? roomJoinDatesRows : [];
+
+            if (lastSeenTimestamp && roomJoinDates.length > 0) {
+                for (const r of roomJoinDates) {
+                    try {
+                        if (new Date(lastSeenTimestamp) < new Date(r.JoiningDate)) {
+                            const [classMetadata] = await safeQuery(`
+                SELECT r.Id as roomId, c.CourseId, c.Name, c.Code, g.GroupName, cl.ClassAvatar, cl.ClassStatus, r.MemberRole
+                FROM courses c
+                JOIN coursegroups g on c.CourseId = g.Id
+                JOIN classes cl on g.Id = cl.CourseGroupId
+                JOIN roommembership r on cl.Id = r.ClassId
+                WHERE r.MemberId = ? and r.IsActive = ? and r.JoiningDate = ?
+              `, [userId, true, r.JoiningDate]);
+
+                            if (Array.isArray(classMetadata) && classMetadata.length > 0) {
+                                try { socket.emit('newClasses', classMetadata); } catch (e) {/* ignore */ }
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('[socket] error checking new class join for user', userId, err);
+                    }
+                }
+            }
+
+            // --- fetch offline messages only if we have rooms ---
+            const roomsArray = rooms.map(item => item.ClassId);
+            let offlineGroupMessages = [];
+            if (roomsArray.length > 0) {
+                const placeholders = roomsArray.map(() => '?').join(',');
+                const query = `
+          SELECT m.Id, m.SenderId,
+            CASE WHEN m.SenderType='staff' THEN st.Lname ELSE s.Lname END as Lname,
+            CASE WHEN m.SenderType='staff' THEN st.ProfileUrl ELSE s.ProfileUrl END as ProfileImage,
+            m.SenderType, m.Text, m.ClassId, m.Timestamp
+          FROM messages m
+          LEFT JOIN staff st on m.SenderId = st.Id
+          LEFT JOIN students s on m.SenderId = s.StudentId
+          WHERE ClassId IN (${placeholders})
+          ${lastSeenTimestamp ? `AND m.Timestamp > ?` : ''}
+          ORDER BY m.Timestamp
+        `;
+                const params = [...roomsArray];
+                if (lastSeenTimestamp) params.push(lastSeenTimestamp);
+
+                const [rows] = await safeQuery(query, params);
+                if (Array.isArray(rows)) offlineGroupMessages = rows;
+            }
+
+            // emit offline messages (if any)
+            try {
+                socket.emit('messages', offlineGroupMessages);
+            } catch (err) {
+                console.warn('[socket] emit messages failed', err);
+            }
+
+            // update or insert user status to online
+            try {
+                const [checkUserStatus] = await safeQuery('SELECT * FROM userstatus WHERE UserId = ?', [userId]);
+                if (!Array.isArray(checkUserStatus) || checkUserStatus.length === 0) {
+                    await safeQuery('INSERT INTO userstatus (UserId, UserType, Status, Timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)', [userId, userRole, 'online']);
+                    console.log('user status created successfully...');
+                } else {
+                    await safeQuery('UPDATE userstatus SET Status = ?, Timestamp = CURRENT_TIMESTAMP WHERE UserId = ?', ['online', userId]);
+                    console.log('user status updated successfully...');
+                }
+            } catch (err) {
+                console.warn('[socket] userstatus insert/update error', err);
+            }
+
+            // join announcement rooms
+            try {
+                socket.join('all');
+                if (userRole === 'staff') {
+                    socket.join('staff');
+                    console.log('user is staff, joining staff room');
+                } else {
+                    socket.join('students');
+                    console.log('user is student, joining student room');
+                }
+            } catch (err) {
+                console.warn('[socket] joining announcement rooms failed', err);
+            }
+
+            // --- message sending handler ---
+            socket.on('roomMessage', async ({ room, message }) => {
+                try {
+                    await safeQuery(
+                        'INSERT INTO messages (SenderId, SenderType, Text, ClassId) VALUES (?, ?, ?, ?)',
+                        [userId, userRole, message, room]
+                    );
+
+                    const [incomingMessageRows] = await safeQuery(`
+            SELECT m.Id, m.SenderId,
+              CASE WHEN m.SenderType='staff' THEN st.Lname ELSE s.Lname END as Lname,
+              CASE WHEN m.SenderType='staff' THEN st.ProfileUrl ELSE s.ProfileUrl END as ProfileImage,
+              m.SenderType, m.Text, m.ClassId, m.Timestamp
+            FROM messages m
+            LEFT JOIN staff st on m.SenderId = st.Id
+            LEFT JOIN students s on m.SenderId = s.StudentId
+            WHERE m.SenderId = ? AND m.ClassId = ?
+            ORDER BY m.Timestamp DESC
+            LIMIT 1
+          `, [userId, room]);
+
+                    if (Array.isArray(incomingMessageRows) && incomingMessageRows.length > 0) {
+                        socket.to(room).emit('incomingMessage', incomingMessageRows[0]);
+                    }
+                } catch (error) {
+                    console.log('database error while handling roomMessage:', error);
+                    try { socket.emit('message_error', { message: 'Failed to send message' }); } catch (e) {/* ignore */ }
+                }
+            });
+
+            // --- disconnect handler ---
+            socket.on('disconnect', async (reason) => {
+                // Use captured userId variable (avoid socket.user which might be altered)
+                try {
+                    console.log(`a user ${socket.id} is disconnected. reason: ${reason}`);
+                    // remove from socket directory
+                    try { removeSocketDir(userId); } catch (e) { console.warn('[socket] socketDirectory.remove failed', e); }
+
+                    // update status to offline
+                    await safeQuery('UPDATE userstatus SET Status = ?, Timestamp = CURRENT_TIMESTAMP WHERE UserId = ?', ['offline', userId]);
+                    console.log('user status updated to offline successfully...');
+                } catch (error) {
+                    console.error('error while disconnecting user:', error);
+                }
+            });
+
+        } catch (connErr) {
+            // catch any unexpected error within connection handler
+            console.error('[socket] unexpected error in connection handler:', connErr);
+            try { socket.disconnect(true); } catch (e) { /* ignore */ }
+        }
+    });
+};
