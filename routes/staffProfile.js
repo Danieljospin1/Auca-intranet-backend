@@ -23,8 +23,8 @@ router.get('/',Authenticate,async(req,res)=>{
 // storing images on server desktop
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
 const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const profile = path.join(uploadFolderPath, 'profiles');
-const profileImagePath = path.join(profile, 'staffImages')
+const profileImagePath = path.join(uploadFolderPath, 'profiles');
+
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -44,7 +44,7 @@ router.post('/',upload.single('profile'),Authenticate,async(req,res)=>{
     const profilePath = profile.path;
     // escapedFilePath will convert a single backslash profile path to a double backslash to solve database problem
     // const escapedProfilePath = profilePath.replace(/\\/g, '\\\\');
-    const ProfileUrl=`http://localhost:3000/staff/imgProfile/${path.basename(profilePath)}`
+    const ProfileUrl=`http://192.168.1.71:3000/staff/imgProfile/${path.basename(profilePath)}`
     try {
 
         await connectionPromise.query(`update staff set ProfileUrl=? where Id=?`,[ProfileUrl,userId]).then(

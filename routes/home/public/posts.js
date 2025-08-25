@@ -9,6 +9,7 @@ const fileSizeFormat = require('../../../utils/fileSizeFormat');
 const { Authenticate } = require('../../../Authentication/authentication')
 const { get } = require('../../../socketDirectory')
 const getPostById = require('../../../utils/getPosts');
+require('dotenv').config();
 
 
 // storing images on server desktop
@@ -62,12 +63,14 @@ router.post('/', upload.fields([
         const fileType = path.extname(PostFile)
         const fileMimeType = req.files?.orgPostFile?.[0]?.mimetype;
         const fileSize = fileSizeFormat(req.files?.orgPostFile?.[0]?.size)
-        const postImageUrl = `http://localhost:3000/home/posts/postImg/${path.basename(PostFile)}`
-        const postThumbnailUrl = `http://localhost:3000/home/posts/postImg/thbnl/${path.basename(PostFileThumbnail)}`
+        const postImageUrl = `${process.env.serverIp}/home/posts/postImg/${path.basename(PostFile)}`
+        const postThumbnailUrl = `${process.env.serverIp}/home/posts/postImg/thbnl/${path.basename(PostFileThumbnail)}`
+        console.log(fileType, postImageUrl, postThumbnailUrl, fileMimeType, fileSize)
 
 
 
         try {
+            await connectionPromise.query("SET time_zone = '+00:00'");
 
 
             // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
@@ -80,7 +83,7 @@ router.post('/', upload.fields([
 
 
             await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, postThumbnailUrl, postImageUrl, fileMimeType, fileSize]).then(
-                res.status(200).json({ message: `Post created successfully...`, postId: PostId })
+                res.status(201).json({ message: `Post created successfully...`, postId: PostId })
                 
             )
             const post = await getPostById(PostId);
@@ -105,10 +108,11 @@ router.post('/', upload.fields([
 
         if (description && audience) {
             console.log(audience)
+            await connectionPromise.query("SET time_zone = '+00:00'");
             // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
             const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]).then(
-                res.status(200).json({ message: `Post created successfully...`})
+                res.status(200).json({ message: `Post created successfully...`,postedById})
             )
             const PostId = insert.insertId;
             // refetching the post to emit it to the socket
@@ -146,95 +150,209 @@ router.post('/', upload.fields([
 
 
 router.get('/', Authenticate, async (req, res) => {
-    const id = req.user.Id
+    const id = req.user.Id;
     const userRole = req.user.role == 'staff' ? 'staff' : 'students';
-    try {
-        const [posts] = await connectionPromise.query(`
-            SELECT 
-    p.Id,
-    -- Selecting the appropriate details based on whether the post is from a student or staff member
-    CASE 
-        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
-        ELSE st.Id 
-    END AS CreatorId,
+    const userLastOnlineTimestamp = req.query.since;
     
-    CASE 
-        WHEN s.StudentId IS NOT NULL THEN s.Fname 
-        ELSE st.Fname 
-    END AS Fname,   
+    console.log('Raw since parameter:', userLastOnlineTimestamp);
     
-    CASE 
-        WHEN s.StudentId IS NOT NULL THEN s.Lname 
-        ELSE st.Lname 
-    END AS Lname,
-    
-    CASE 
-        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
-        ELSE st.ProfileUrl 
-    END AS ProfileUrl,
-    
-    CASE 
-        WHEN s.StudentId IS NOT NULL THEN 'Student' 
-        ELSE st.Role 
-    END AS Role,
-    
-    
-    p.Description,
-    p.Timestamp,
-    f.FileType,
-    f.ThumbnailUrl,
-    f.FullUrl,
-    f.FileSize,
-    p.Audience,
-
-
-    -- Subqueries for counting interactions
-    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS postReactions,
-    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS reactionTypes,
-    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS postComments
-
-
-
-FROM 
-    posts p
--- LEFT JOIN with students to get student information if the creator is a student
-LEFT JOIN 
-    students s ON p.CreatorId = s.StudentId
--- LEFT JOIN with staff to get staff information if the creator is a staff member
-LEFT JOIN 
-    staff st ON p.CreatorId = st.Id
-LEFT JOIN 
-    postfiles f on p.Id=f.PostId
-WHERE 
-    p.Audience =? OR p.Audience = 'all'
-GROUP BY 
-    p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
-    st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-    p.CreatorId, p.Description, p.Timestamp,f.FileType,
-    f.ThumbnailUrl,
-    f.FullUrl,
-    f.FileSize,
-    p.Audience
-ORDER BY 
-    p.Timestamp DESC;
-
-
-`, [userRole])
-        res.status(200).json(posts)
+    // Check if since parameter exists and is valid
+    if (userLastOnlineTimestamp) {
+        const userLastOnlineDate = new Date(userLastOnlineTimestamp);
+        console.log('Parsed date:', userLastOnlineDate);
+        console.log('Is valid date:', !isNaN(userLastOnlineDate.getTime()));
+        
+        // Validate the date
+        if (isNaN(userLastOnlineDate.getTime())) {
+            return res.status(400).json({ 
+                error: 'Invalid timestamp format',
+                received: userLastOnlineTimestamp,
+                expected: 'ISO 8601 format like 2025-08-16T19:40:23.443Z'
+            });
+        }
+        
+        try {
+            await connectionPromise.query("SET time_zone = '+00:00'");
+            
+            // Convert to MySQL datetime format for debugging
+            const mysqlDateFormat = userLastOnlineDate.toISOString().slice(0, 19).replace('T', ' ');
+            console.log('MySQL format:', mysqlDateFormat);
+            
+            const query = `
+                SELECT 
+                    p.Id,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
+                        ELSE st.Id 
+                    END AS CreatorId,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.Fname 
+                        ELSE st.Fname 
+                    END AS Fname,   
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.Lname 
+                        ELSE st.Lname 
+                    END AS Lname,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
+                        ELSE st.ProfileUrl 
+                    END AS ProfileUrl,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN 'Student' 
+                        ELSE st.Role 
+                    END AS Role,
+                    p.Description,
+                    p.Timestamp,
+                    f.FileType,
+                    f.ThumbnailUrl,
+                    f.FullUrl,
+                    f.FileSize,
+                    p.Audience as AudienceType,
+                    st.Department,
+                    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
+                    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
+                    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS PostComments
+                FROM posts p
+                LEFT JOIN students s ON p.CreatorId = s.StudentId
+                LEFT JOIN staff st ON p.CreatorId = st.Id
+                LEFT JOIN postfiles f ON p.Id = f.PostId
+                WHERE (p.Audience = ? OR p.Audience = 'all') 
+                    AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
+                GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
+                         st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
+                         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+                         f.ThumbnailUrl, f.FullUrl, f.FileSize, p.Audience,st.Department
+                ORDER BY p.Timestamp DESC
+            `;
+            
+            console.log('Executing query with params:', [userRole, userLastOnlineDate]);
+            
+            const [posts] = await connectionPromise.query(query, [userRole, userLastOnlineDate]);
+            
+            console.log('Query result count:', posts.length);
+            
+            // Format timestamps to ISO strings for consistency
+            const formattedPosts = posts.map(post => ({
+                ...post,
+                Timestamp: new Date(post.Timestamp).toISOString()
+            }));
+            
+            res.status(200).json({
+                success: true,
+                posts: formattedPosts,
+                count: formattedPosts.length,
+                since: userLastOnlineTimestamp,
+                server_time: new Date().toISOString()
+            });
+            
+        } catch (err) {
+            console.error('Database error:', err);
+            res.status(500).json({ 
+                error: "Error fetching posts",
+                details: err.message 
+            });
+        }
+    } else {
+        // Original code for when no 'since' parameter is provided
+        try {
+            await connectionPromise.query("SET time_zone = '+00:00'");
+            
+            const [posts] = await connectionPromise.query(`
+                SELECT 
+                    p.Id,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
+                        ELSE st.Id 
+                    END AS CreatorId,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.Fname 
+                        ELSE st.Fname 
+                    END AS Fname,   
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.Lname 
+                        ELSE st.Lname 
+                    END AS Lname,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
+                        ELSE st.ProfileUrl 
+                    END AS ProfileUrl,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN 'Student' 
+                        ELSE st.Role 
+                    END AS Role,
+                    p.Description,
+                    p.Timestamp,
+                    f.FileType,
+                    f.ThumbnailUrl,
+                    f.FullUrl,
+                    f.FileSize,
+                    p.Audience as AudienceType,
+                    st.Department,
+                    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
+                    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
+                    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS PostComments
+                FROM posts p
+                LEFT JOIN students s ON p.CreatorId = s.StudentId
+                LEFT JOIN staff st ON p.CreatorId = st.Id
+                LEFT JOIN postfiles f ON p.Id = f.PostId
+                WHERE p.Audience = ? OR p.Audience = 'all'
+                GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
+                         st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
+                         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+                         f.ThumbnailUrl, f.FullUrl, f.FileSize, p.Audience,st.Department
+                ORDER BY p.Timestamp DESC
+            `, [userRole]);
+            
+            // Format timestamps to ISO strings for consistency
+            const formattedPosts = posts.map(post => ({
+                ...post,
+                Timestamp: new Date(post.Timestamp).toISOString()
+            }));
+            
+            res.status(200).json({
+                success: true,
+                posts: formattedPosts,
+                count: formattedPosts.length,
+                server_time: new Date().toISOString()
+            });
+            
+        } catch (err) {
+            console.error('Database error:', err);
+            res.status(500).json({ 
+                error: "Error fetching posts",
+                details: err.message 
+            });
+        }
     }
-    catch (err) {
-        console.log(err)
-    }
-})
+});
+
 router.delete('/', Authenticate, async (req, res) => {
-    const Id = req.body.Id
+    const Id = req.body.Id;
+    
+    if (!Id) {
+        return res.status(400).json({ error: 'Post ID is required' });
+    }
+    
     try {
-        await connectionPromise.query(`delete from posts where Id=?`, [Id]).then(
-            res.status(200).json({ message: `Post deleted successfully...` })
-        )
+        const [result] = await connectionPromise.query(`DELETE FROM posts WHERE Id = ?`, [Id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Post not found' });
+        }
+        
+        res.status(200).json({ 
+            success: true,
+            message: `Post deleted successfully`,
+            deletedId: Id 
+        });
+        
+    } catch (err) {
+        console.error('Delete error:', err);
+        res.status(500).json({ 
+            error: 'Error deleting post',
+            details: err.message 
+        });
     }
-    catch (err) {
-        console.log(err)
-    }
-})
+});
+
 module.exports = router;

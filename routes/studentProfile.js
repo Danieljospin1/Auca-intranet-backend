@@ -6,6 +6,7 @@ const multer = require('multer')
 const fs = require('fs')
 const os = require('os')
 const path = require('path');
+require('dotenv').config();
 
 
 router.get('/', Authenticate, async (req, res) => {
@@ -38,7 +39,7 @@ router.patch('/', Authenticate, async (req, res) => {
 
         if (!Phone && Email) {
             const [userProfile] = await connectionPromise.query(`update students set Email=? where StudentId=?}`,[Email,StudentId]);
-            res.send("updated...")
+            res.send("Email updated...")
 
 
 
@@ -54,8 +55,7 @@ router.patch('/', Authenticate, async (req, res) => {
 // storing images on server desktop
 const desktopFolderPath = path.join(os.homedir(), 'Desktop');
 const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const profile = path.join(uploadFolderPath, 'profiles');
-const profileImagePath = path.join(profile, 'studentsImages')
+const profileImagePath = path.join(uploadFolderPath, 'profiles');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -72,11 +72,15 @@ const upload = multer({ storage: storage });
 
 router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     const StudentId = req.user.Id;
-    const profile = req.file;
-    const profilePath = profile.path;
+    const profilePath = req.file.path;
+    console.log(profilePath)
+
+    if(!profilePath){
+        return res.status(400).json({ message: "No profile image uploaded" });
+    }
     // escapedFilePath will convert a single backslash profile path to a double backslash to solve database problem
     // const escapedProfilePath = profilePath.replace(/\\/g, '\\\\');
-    const ProfileUrl=`http://localhost:3000/student/imgProfile/${path.basename(profilePath)}`
+    const ProfileUrl=`${process.env.serverIp}/student/imgProfile/${path.basename(profilePath)}`
     try {
 
         await connectionPromise.query(`update students set ProfileUrl=? where StudentId=?`,[ProfileUrl,StudentId]).then(
@@ -89,5 +93,27 @@ router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     catch{(error)=>{
         res.status(500).json({ message: error.message })
     }}
+})
+router.delete('/', Authenticate, async (req, res)=>{
+    // this is the route to delete student profile image
+    const StudentId = req.user.Id;
+    try {
+        const [studentProfile] = await connectionPromise.query(`select ProfileUrl from students where StudentId=?`,[StudentId]);
+        if (studentProfile[0].ProfileUrl) {
+            const profileImage = studentProfile[0].ProfileUrl.split('/').pop();
+            const profileImagePath = path.join(uploadFolderPath, 'profiles', profileImage);
+            fs.unlink(profileImagePath, (err) => {
+                if (err) {
+                    return res.status(500).json({ message: "Error deleting profile image" });
+                }
+                connectionPromise.query(`update students set ProfileUrl=NULL where StudentId=?`,[StudentId]);
+                res.status(200).json({ message: "Profile image deleted successfully" });
+            });
+        } else {
+            res.status(404).json({ message: "No profile image found to delete" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 })
 module.exports = router;

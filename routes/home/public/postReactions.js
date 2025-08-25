@@ -4,20 +4,20 @@ const connectionPromise = require('../../../database & models/databaseConnection
 const {Authenticate} = require('../../../Authentication/authentication')
 
 router.post('/', Authenticate, async (req, res) => {
-    const postId = req.body.Id;
-    const reactionType = req.body.ReactionType;
+    const postId = req.body.postId;
+    const reactionType = req.body.reactionType;
     const userId = req.user.Id;
     const userRole = req.user.role;
 
     try {
-        const [checkPastReaction] = await connectionPromise.query(`select * from POSTREACTIONS where PostId=${postId} AND PostedById=${userId}`)
-        if (checkPastReaction[0]) {
-            await connectionPromise.query(`update POSTREACTIONS set ReactionType='${reactionType}' where PostId=${postId} AND PostedById=${userId}`).then(
+        const [checkPastReaction] = await connectionPromise.query(`select * from postreactions where PostId=? AND PostedById=?`,[postId,userId]);
+        if (checkPastReaction.length > 0) {
+            await connectionPromise.query(`update postreactions set ReactionType=? where PostId=? AND PostedById=?`,[reactionType,postId,userId]).then(
                 res.send('reaction updated successfully!!!')
             )
         }
         else {
-            await connectionPromise.query(`insert into POSTREACTIONS(PostId,PostedById,UserRole,ReactionType) values(${postId},${userId},'${userRole}','${reactionType}')`).then(
+            await connectionPromise.query(`insert into postreactions(PostId,PostedById,UserRole,ReactionType) values(${postId},${userId},'${userRole}','${reactionType}')`).then(
                 res.send('reaction posted!!!')
             )
         }
@@ -30,11 +30,11 @@ router.post('/', Authenticate, async (req, res) => {
 })
 
 router.delete('/', Authenticate, async (req, res) => {
-    const postId = req.body.Id;
+    const postId = req.body.postId;
     const userId = req.user.Id;
 
     try {
-        await connectionPromise.query(`delete from POSTREACTIONS where PostId=${postId} AND PostedById=${userId}`).then(
+        await connectionPromise.query(`delete from postreactions where PostId=? AND PostedById=?`,[postId,userId]).then(
             res.send('reaction has been removed')
         )
     } catch {

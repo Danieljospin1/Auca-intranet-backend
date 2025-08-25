@@ -8,8 +8,7 @@ router.get('/:ProfileId', (req, res) => {
     const ProfileId = req.params.ProfileId;
     const desktopFolderPath = path.join(os.homedir(), 'Desktop');
     const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-    const profile = path.join(uploadFolderPath, 'profiles');
-    const profileImagePath = path.join(profile, 'staffImages')
+    const profileImagePath = path.join(uploadFolderPath, 'profiles');
     const profileData = path.join(profileImagePath, `${ProfileId}`)
     if(profileData){
         res.sendFile(profileData, (err) => {

@@ -27,9 +27,9 @@ router.post('/', Authenticate, async (req, res) => {
 
 })
 router.get('/', async (req, res) => {
-    const postId = req.body.postId
+    const {postId} = req.query
     try {
-        const comments = await connectionPromise.query(`SELECT 
+        const [comments] = await connectionPromise.query(`SELECT 
 c.Id,
 c.Text,
 c.Timestamp,
@@ -48,7 +48,7 @@ LEFT JOIN
 students s ON s.StudentId = c.CommentedById AND UserType = 'student'
 LEFT JOIN 
 staff st ON st.Id = c.CommentedById AND UserType = 'staff' where PostId=? order by c.Timestamp asc`,[postId])
-        res.json(comments[0])
+        res.json(comments)
     }
     catch {
         (err) => {
