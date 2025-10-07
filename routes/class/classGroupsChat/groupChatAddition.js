@@ -26,8 +26,8 @@ router.post('/:classId/:memberId/', async (req, res) => {
                 //querying class meta data a user joined....
 
                 const [classMetadata] = await connectionPromise.query(`
-                                    select r.Id as roomId,c.CourseId,c.Name,c.Code,g.GroupName,cl.ClassAvatar,Cl.ClassStatus,r.MemberRole from 
-                                    courses c join courseGroups g on c.CourseId=g.Id 
+                                    select cl.Id as ClassId,c.Name as ClassName,c.Code as CourseCode,g.GroupName,cl.ClassAvatar,cl.ClassStatus,r.MemberRole from 
+                                    courses c join coursegroups g on c.CourseId=g.Id 
                                     join classes cl on g.Id=cl.CourseGroupId 
                                     join roommembership r on cl.Id=r.ClassId where r.MemberId=? AND c.CourseId=? and r.IsActive=?`, [memberId,classId,true]);
                 userSocket.emit('newClasses', classMetadata)

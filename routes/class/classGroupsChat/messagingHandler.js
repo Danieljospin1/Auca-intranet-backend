@@ -109,7 +109,7 @@ module.exports = async (io) => {
                     try {
                         if (new Date(lastSeenTimestamp) < new Date(r.JoiningDate)) {
                             const [classMetadata] = await safeQuery(`
-                SELECT r.Id as roomId, c.CourseId, c.Name, c.Code, g.GroupName, cl.ClassAvatar, cl.ClassStatus, r.MemberRole
+                SELECT cl.Id as ClassId, c.Name as ClassName, c.Code as CourseCode, g.GroupName, cl.ClassAvatar, cl.ClassStatus, r.MemberRole
                 FROM courses c
                 JOIN coursegroups g on c.CourseId = g.Id
                 JOIN classes cl on g.Id = cl.CourseGroupId
@@ -187,8 +187,9 @@ module.exports = async (io) => {
             }
 
             // --- message sending handler ---
-            socket.on('roomMessage', async ({ room, message }) => {
+            socket.on('roomMessage', async ({ room, message, messageTemporaryId }, acknowledgment) => {
                 try {
+                    console.log(message)
                     await safeQuery(
                         'INSERT INTO messages (SenderId, SenderType, Text, ClassId) VALUES (?, ?, ?, ?)',
                         [userId, userRole, message, room]
@@ -208,13 +209,35 @@ module.exports = async (io) => {
           `, [userId, room]);
 
                     if (Array.isArray(incomingMessageRows) && incomingMessageRows.length > 0) {
-                        socket.to(room).emit('incomingMessage', incomingMessageRows[0]);
+                        console.log("this is working", incomingMessageRows, messageTemporaryId)
+                        socket.to(room).emit('messages', incomingMessageRows);
+                        acknowledgment(incomingMessageRows, messageTemporaryId);
+                        
+
                     }
                 } catch (error) {
                     console.log('database error while handling roomMessage:', error);
                     try { socket.emit('message_error', { message: 'Failed to send message' }); } catch (e) {/* ignore */ }
                 }
             });
+            socket.on('pinnedMessage', async ({ ClassId, MessageId }) => {
+                if (!ClassId || !MessageId) {
+                    console.log("no enough data (classId, message id)")
+                }
+                try {
+                    const checkPinnedMessage = await safeQuery('select * from messages where ClassId=? and Id=? and IsPinned=?', [ClassId, MessageId, 1]);
+                    if (checkPinnedMessage.length > 0) {
+                        await safeQuery('update messages set IsPinned=? where Id=? and ClassId=?', [0, MessageId, ClassId])
+                    }
+                    await safeQuery('update messages set IsPinned=? where Id=? and ClassId=?', [1, MessageId, ClassId]);
+                    console.log(typeof (ClassId))
+                    socket.to(String(ClassId)).emit("messagePin", { ClassId, MessageId })
+                    console.log("updated message pinning successfully!!!")
+                }
+                catch (err) {
+                    console.log(err)
+                }
+            })
 
             // --- disconnect handler ---
             socket.on('disconnect', async (reason) => {
