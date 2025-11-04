@@ -44,4 +44,39 @@ router.delete('/', Authenticate, async (req, res) => {
     }
 
 })
+router.patch('/', async (req, res) => {
+    const postIds = req.body.postIds;
+    try {
+        if (!postIds || postIds.length === 0) {
+            return res.status(400).json({ error: 'No post IDs provided' });
+        }
+
+        // Use parameterized query to prevent SQL injection
+        const placeholders = postIds.map(() => '?').join(',');
+        
+        const [reactions] = await connectionPromise.query(
+            `SELECT 
+                PostId,
+                JSON_ARRAYAGG(ReactionType) as ReactionTypes,
+                COUNT(*) as count
+            FROM postreactions 
+            WHERE PostId IN (${placeholders})
+            GROUP BY PostId`,
+            postIds
+        );
+
+        // Format the response
+        const formattedReactions = reactions.map(reaction => ({
+            PostId: reaction.PostId,
+            ReactionTypes: reaction.ReactionTypes || [],
+            count: reaction.count
+        }));
+
+        res.status(200).json(formattedReactions);
+    }
+    catch (err) {
+        console.error('Error fetching reactions:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 module.exports = router;
