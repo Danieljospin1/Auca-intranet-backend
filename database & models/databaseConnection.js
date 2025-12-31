@@ -3,12 +3,12 @@ const mysql=require('mysql2');
 require('dotenv').config();
 
 const DBconnection=mysql.createPool({
-  host:'localhost',
+  host:'yamanote.proxy.rlwy.net',
   user:process.env.dbroot,
-  password:process.env.dbpassword,
-  database:process.env.dbname,
-  port:3306,
-  timezone: '+00:00'
+  password:'PeBvUJyIvdQPTqrbKVijuviMHZHrJmzQ',
+  database:'railway',
+  port:34899,
+  //timezone: '+00:00'
   
 });
 const connectionPromise=DBconnection.promise();

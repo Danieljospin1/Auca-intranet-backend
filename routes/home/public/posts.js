@@ -10,42 +10,47 @@ const { Authenticate } = require('../../../Authentication/authentication')
 const { get } = require('../../../socketDirectory')
 const getPostById = require('../../../utils/getPosts');
 require('dotenv').config();
+const upload = require("../../../fileHandler/upload");
+const uploadImage = require("../../../fileHandler/uploadImage");
 
 
-// storing images on server desktop
-const desktopFolderPath = path.join(os.homedir(), 'Desktop');
-const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const postsFolderLocation = path.join(uploadFolderPath, 'posts')
-const thumbNailFolderLocation = path.join(uploadFolderPath, 'thumbnails');
+// // storing images on server desktop
+// const desktopFolderPath = path.join(os.homedir(), 'Desktop');
+// const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
+// const postsFolderLocation = path.join(uploadFolderPath, 'posts')
+// const thumbNailFolderLocation = path.join(uploadFolderPath, 'thumbnails');
 
-// defining image posts storage
+// // defining image posts storage
 
-const storage = multer.diskStorage({
+// const storage = multer.diskStorage({
 
-    destination: function (req, file, cb) {
-        if (file.fieldname == 'orgPostFile') {
-            cb(null, postsFolderLocation)
-        }
-        if (file.fieldname == 'postFileThumbnail') {
-            cb(null, thumbNailFolderLocation)
-        }
-    },
-    filename: function (req, file, cb) {
-        const fileName = Date.now() + path.extname(file.originalname)
-        cb(null, fileName)
+//     destination: function (req, file, cb) {
+//         if (file.fieldname == 'orgPostFile') {
+//             cb(null, postsFolderLocation)
+//         }
+//         if (file.fieldname == 'postFileThumbnail') {
+//             cb(null, thumbNailFolderLocation)
+//         }
+//     },
+//     filename: function (req, file, cb) {
+//         const fileName = Date.now() + path.extname(file.originalname)
+//         cb(null, fileName)
 
-    }
-})
-const upload = multer({ storage: storage });
+//     }
+// })
 
-router.post('/', upload.fields([
-    { name: "orgPostFile", maxCount: 1 },
+// WE will use cloudinary to store images instead of local storage
 
-    { name: "postFileThumbnail", maxCount: 1 }
-]), Authenticate, async (req, res) => {
-    const PostFile = req.files?.orgPostFile?.[0]?.path;
-    const PostFileThumbnail = req.files?.postFileThumbnail?.[0]?.path;
-    console.log(PostFile)
+
+
+
+
+router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
+
+    const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer);
+const PostFile = originalUrl;
+const PostFileThumbnail = blurredUrl;
+
 
 
 
@@ -55,17 +60,15 @@ router.post('/', upload.fields([
     const role = req.user.role;
     const io = req.app.get('io');
 
-    
+
 
 
 
     if (PostFile && PostFileThumbnail) {
         const fileType = path.extname(PostFile)
-        const fileMimeType = req.files?.orgPostFile?.[0]?.mimetype;
-        const fileSize = fileSizeFormat(req.files?.orgPostFile?.[0]?.size)
-        const postImageUrl = `${process.env.serverIp}/home/posts/postImg/${path.basename(PostFile)}`
-        const postThumbnailUrl = `${process.env.serverIp}/home/posts/postImg/thbnl/${path.basename(PostFileThumbnail)}`
-        console.log(fileType, postImageUrl, postThumbnailUrl, fileMimeType, fileSize)
+        const fileMimeType = req.file.mimetype;
+        const fileSize = fileSizeFormat(req.file.size)
+        console.log(fileType, PostFile, PostFileThumbnail, fileMimeType, fileSize)
 
 
 
@@ -77,14 +80,14 @@ router.post('/', upload.fields([
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
             const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
             const PostId = insert.insertId;
-            console.log({"this":PostId})
-            console.log(fileType, postImageUrl, postThumbnailUrl, fileMimeType, fileSize)
+            console.log({ "this": PostId })
+            console.log(fileType, PostFile, PostFileThumbnail, fileMimeType, fileSize)
 
 
 
-            await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, postThumbnailUrl, postImageUrl, fileMimeType, fileSize]).then(
+            await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]).then(
                 res.status(201).json({ message: `Post created successfully...`, postId: PostId })
-                
+
             )
             const post = await getPostById(PostId);
             if (post) {
@@ -103,46 +106,46 @@ router.post('/', upload.fields([
             console.log(err)
         }
     }
-    else{
+    else {
         try {
 
-        if (description && audience) {
-            console.log(audience)
-            await connectionPromise.query("SET time_zone = '+00:00'");
-            // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
-            // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-            const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]).then(
-                res.status(200).json({ message: `Post created successfully...`,postedById})
-            )
-            const PostId = insert.insertId;
-            // refetching the post to emit it to the socket
-            const post = await getPostById(PostId);
-            if (post) {
-                if (audience == 'all') {
-                    io.to('all').emit('newPost', post);
+            if (description && audience) {
+                console.log(audience)
+                await connectionPromise.query("SET time_zone = '+00:00'");
+                // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
+                // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
+                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]).then(
+                    res.status(200).json({ message: `Post created successfully...`, postedById })
+                )
+                const PostId = insert.insertId;
+                // refetching the post to emit it to the socket
+                const post = await getPostById(PostId);
+                if (post) {
+                    if (audience == 'all') {
+                        io.to('all').emit('newPost', post);
+                    }
+                    if (audience == 'staff') {
+                        io.to('staff').emit('newPost', post);
+                    }
+                    if (audience == 'students') {
+                        io.to('students').emit('newPost', post);
+                    }
                 }
-                if (audience == 'staff') {
-                    io.to('staff').emit('newPost', post);
-                }
-                if (audience == 'students') {
-                    io.to('students').emit('newPost', post);
-                }
+
+            }
+            else {
+                return res.status(400).json({ message: 'Please provide all required fields.' });
             }
 
+
+
         }
-        else {
-            return res.status(400).json({ message: 'Please provide all required fields.' });
+
+        catch {
+            (err) => {
+                console.log(err);
+            }
         }
-
-
-
-    }
-
-    catch {
-        (err) => {
-            console.log(err);
-        }
-    }
 
     }
 
@@ -153,31 +156,31 @@ router.get('/', Authenticate, async (req, res) => {
     const id = req.user.Id;
     const userRole = req.user.role == 'staff' ? 'staff' : 'students';
     const userLastOnlineTimestamp = req.query.since;
-    
+
     console.log('Raw since parameter:', userLastOnlineTimestamp);
-    
+
     // Check if since parameter exists and is valid
     if (userLastOnlineTimestamp) {
         const userLastOnlineDate = new Date(userLastOnlineTimestamp);
         console.log('Parsed date:', userLastOnlineDate);
         console.log('Is valid date:', !isNaN(userLastOnlineDate.getTime()));
-        
+
         // Validate the date
         if (isNaN(userLastOnlineDate.getTime())) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'Invalid timestamp format',
                 received: userLastOnlineTimestamp,
                 expected: 'ISO 8601 format like 2025-08-16T19:40:23.443Z'
             });
         }
-        
+
         try {
             await connectionPromise.query("SET time_zone = '+00:00'");
-            
+
             // Convert to MySQL datetime format for debugging
             const mysqlDateFormat = userLastOnlineDate.toISOString().slice(0, 19).replace('T', ' ');
             console.log('MySQL format:', mysqlDateFormat);
-            
+
             const query = `
                 SELECT 
                     p.Id,
@@ -224,19 +227,19 @@ router.get('/', Authenticate, async (req, res) => {
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, p.Audience,st.Department
                 ORDER BY p.Timestamp DESC
             `;
-            
+
             console.log('Executing query with params:', [userRole, userLastOnlineDate]);
-            
+
             const [posts] = await connectionPromise.query(query, [userRole, userLastOnlineDate]);
-            
+
             console.log('Query result count:', posts.length);
-            
+
             // Format timestamps to ISO strings for consistency
             const formattedPosts = posts.map(post => ({
                 ...post,
                 Timestamp: new Date(post.Timestamp).toISOString()
             }));
-            
+
             res.status(200).json({
                 success: true,
                 posts: formattedPosts,
@@ -244,19 +247,19 @@ router.get('/', Authenticate, async (req, res) => {
                 since: userLastOnlineTimestamp,
                 server_time: new Date().toISOString()
             });
-            
+
         } catch (err) {
             console.error('Database error:', err);
-            res.status(500).json({ 
+            res.status(500).json({
                 error: "Error fetching posts",
-                details: err.message 
+                details: err.message
             });
         }
     } else {
         // Original code for when no 'since' parameter is provided
         try {
             await connectionPromise.query("SET time_zone = '+00:00'");
-            
+
             const [posts] = await connectionPromise.query(`
                 SELECT 
                     p.Id,
@@ -302,25 +305,25 @@ router.get('/', Authenticate, async (req, res) => {
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, p.Audience,st.Department
                 ORDER BY p.Timestamp DESC
             `, [userRole]);
-            
+
             // Format timestamps to ISO strings for consistency
             const formattedPosts = posts.map(post => ({
                 ...post,
                 Timestamp: new Date(post.Timestamp).toISOString()
             }));
-            
+
             res.status(200).json({
                 success: true,
                 posts: formattedPosts,
                 count: formattedPosts.length,
                 server_time: new Date().toISOString()
             });
-            
+
         } catch (err) {
             console.error('Database error:', err);
-            res.status(500).json({ 
+            res.status(500).json({
                 error: "Error fetching posts",
-                details: err.message 
+                details: err.message
             });
         }
     }
@@ -328,29 +331,29 @@ router.get('/', Authenticate, async (req, res) => {
 
 router.delete('/', Authenticate, async (req, res) => {
     const Id = req.body.Id;
-    
+
     if (!Id) {
         return res.status(400).json({ error: 'Post ID is required' });
     }
-    
+
     try {
         const [result] = await connectionPromise.query(`DELETE FROM posts WHERE Id = ?`, [Id]);
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Post not found' });
         }
-        
-        res.status(200).json({ 
+
+        res.status(200).json({
             success: true,
             message: `Post deleted successfully`,
-            deletedId: Id 
+            deletedId: Id
         });
-        
+
     } catch (err) {
         console.error('Delete error:', err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Error deleting post',
-            details: err.message 
+            details: err.message
         });
     }
 });
