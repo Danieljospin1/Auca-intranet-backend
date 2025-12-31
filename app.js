@@ -1,6 +1,6 @@
 const express=require('express')
 const app=express()
-const port= 3000
+const port= process.env.PORT || 3000;
 const socketIo=require('socket.io')
 const http=require('http')
 const socketRoutes=require('./routes/class/classGroupsChat/messagingHandler')

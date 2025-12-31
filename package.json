@@ -2,7 +2,7 @@
   "name": "auca-intranet-backend",
   "version": "1.0.0",
   "description": "this is a backend repository of auca intranet app.",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "jest",
     "start": "node app.js",
