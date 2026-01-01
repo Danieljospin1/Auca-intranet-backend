@@ -30,10 +30,11 @@
     "nodemon": "^3.1.4"
   },
   "engines": {
-  "node": "22.18.0"
+  "node": "20.x"
 },
 
   "overrides": {
+    "get-intrinsic": "1.2.4",
     "gopd": "1.0.1"
   }
 
