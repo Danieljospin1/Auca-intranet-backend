@@ -5,6 +5,7 @@ const connectionPromise=require('../database & models/databaseConnection');
 const path = require('path')
 const os=require('os')
 const multer=require('multer')
+const uploadImage=require('../fileHandler/uploadImage');
 
 router.get('/',Authenticate,async(req,res)=>{
     const userID=req.user.Id;
@@ -21,33 +22,35 @@ router.get('/',Authenticate,async(req,res)=>{
 // the following is the route to upload profile for staff
 // we will use multer to handle image file uploads
 // storing images on server desktop
-const desktopFolderPath = path.join(os.homedir(), 'Desktop');
-const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const profileImagePath = path.join(uploadFolderPath, 'profiles');
+// const desktopFolderPath = path.join(os.homedir(), 'Desktop');
+// const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
+// const profileImagePath = path.join(uploadFolderPath, 'profiles');
 
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null,profileImagePath)
-    },
-    filename: (req, file, cb) => {
-        const profileName=Date.now() + path.extname(file.originalname)
-        cb(null,profileName)
-    }
+// const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//         cb(null,profileImagePath)
+//     },
+//     filename: (req, file, cb) => {
+//         const profileName=Date.now() + path.extname(file.originalname)
+//         cb(null,profileName)
+//     }
 
-})
-const upload = multer({ storage: storage });
+// })
+// const upload = multer({ storage: storage });
 
 router.post('/',upload.single('profile'),Authenticate,async(req,res)=>{
     const userId = req.user.Id;
-    const profile = req.file;
-    const profilePath = profile.path;
+    const { originalUrl } = await uploadImage(req.file.buffer,true);
     // escapedFilePath will convert a single backslash profile path to a double backslash to solve database problem
     // const escapedProfilePath = profilePath.replace(/\\/g, '\\\\');
-    const ProfileUrl=`http://192.168.1.71:3000/staff/imgProfile/${path.basename(profilePath)}`
+    // const ProfileUrl=`http://192.168.1.71:3000/staff/imgProfile/${path.basename(profilePath)}`
+    if(!originalUrl){
+        return res.status(400).json({ message: "No profile image uploaded" });
+    }
     try {
 
-        await connectionPromise.query(`update staff set ProfileUrl=? where Id=?`,[ProfileUrl,userId]).then(
+        await connectionPromise.query(`update staff set ProfileUrl=? where Id=?`,[originalUrl,userId]).then(
             res.send('Profile uploaded...')
             
         ).catch((err)=>{

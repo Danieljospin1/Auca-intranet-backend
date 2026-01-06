@@ -56,6 +56,9 @@ app.use('/staff/imgProfile',staffProfileHandler)
 app.use('/home/posts',postsFileHandler)
 app.use('/home/posts',postImgThumbnail)
 app.use('/notifications',notification)
+app.get('/health',(req,res)=>{
+    res.send('Auca Intranet Backend is running')
+})
 
 
 

@@ -7,6 +7,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path');
 require('dotenv').config();
+const uploadImage=require('../fileHandler/uploadImage');
 
 
 router.get('/', Authenticate, async (req, res) => {
@@ -53,37 +54,37 @@ router.patch('/', Authenticate, async (req, res) => {
 // the following is the route to upload profile for students
 // we will use multer to handle image file uploads
 // storing images on server desktop
-const desktopFolderPath = path.join(os.homedir(), 'Desktop');
-const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const profileImagePath = path.join(uploadFolderPath, 'profiles');
+// const desktopFolderPath = path.join(os.homedir(), 'Desktop');
+// const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
+// const profileImagePath = path.join(uploadFolderPath, 'profiles');
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null,profileImagePath)
-    },
-    filename: (req, file, cb) => {
-        const profileName=Date.now() + path.extname(file.originalname)
-        cb(null,profileName)
-    }
+// const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//         cb(null,profileImagePath)
+//     },
+//     filename: (req, file, cb) => {
+//         const profileName=Date.now() + path.extname(file.originalname)
+//         cb(null,profileName)
+//     }
 
-})
-const upload = multer({ storage: storage });
+// })
+
+// const upload = multer({ storage: storage });
 
 
 router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     const StudentId = req.user.Id;
-    const profilePath = req.file.path;
-    console.log(profilePath)
+    const { originalUrl } = await uploadImage(req.file.buffer,false);
 
-    if(!profilePath){
+    if(!originalUrl){
         return res.status(400).json({ message: "No profile image uploaded" });
     }
     // escapedFilePath will convert a single backslash profile path to a double backslash to solve database problem
     // const escapedProfilePath = profilePath.replace(/\\/g, '\\\\');
-    const ProfileUrl=`${process.env.serverIp}/student/imgProfile/${path.basename(profilePath)}`
+    // const ProfileUrl=`${process.env.serverIp}/student/imgProfile/${path.basename(profilePath)}`
     try {
 
-        await connectionPromise.query(`update students set ProfileUrl=? where StudentId=?`,[ProfileUrl,StudentId]).then(
+        await connectionPromise.query(`update students set ProfileUrl=? where StudentId=?`,[originalUrl,StudentId]).then(
             res.send('Profile uploaded...')
             
         ).catch((err)=>{

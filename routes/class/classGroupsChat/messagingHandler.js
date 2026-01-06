@@ -33,7 +33,7 @@ module.exports = async (io) => {
                 console.warn('[socket] error checking existing sockets', err);
             }
 
-            // Save this socket in your directory
+            // Saving socket in directory
             try {
                 setSocketDir(userId, socket);
             } catch (err) {
@@ -71,7 +71,7 @@ module.exports = async (io) => {
                 return [[], null];
             };
 
-            // --- find the rooms the user belongs to ---
+            // --- finding the rooms the user belongs to ---
             const [roomsRows] = await safeQuery(
                 'SELECT ClassId FROM roommembership WHERE MemberId = ? AND IsActive = ?',
                 [userId, true]

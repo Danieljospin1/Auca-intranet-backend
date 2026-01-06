@@ -1,10 +1,10 @@
 const cloudinary = require("./cloudinary");
 
-const uploadImage = async (fileBuffer) => {
+const uploadImage = async (fileBuffer,isPost) => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       {
-        folder: "posts",
+        folder: isPost ? "posts" : "profiles",
         resource_type: "image",
         quality: "auto",
         fetch_format: "auto",
@@ -16,14 +16,14 @@ const uploadImage = async (fileBuffer) => {
         const originalUrl = result.secure_url;
 
         // BLURRED + COMPRESSED version (derived, NOT re-uploaded)
-        const blurredUrl = cloudinary.url(result.public_id, {
+        const blurredUrl = isPost ? cloudinary.url(result.public_id, {
           transformation: [
             { width: 600, crop: "scale" },
             { effect: "blur:300" },
             { quality: "auto:low" },
           ],
           secure: true,
-        });
+        }) : originalUrl;
 
         resolve({
           originalUrl,
