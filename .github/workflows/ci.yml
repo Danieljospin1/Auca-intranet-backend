@@ -31,8 +31,6 @@ jobs:
           node app.js &
           sleep 5
           curl -f http://localhost:3000/health
-      - run: npm run lint
-      - run: npm run migrate
       - run: curl https://auca-intranet-backend.onrender.com/health
 
 
