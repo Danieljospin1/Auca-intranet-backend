@@ -47,7 +47,7 @@ const uploadImage = require("../../../fileHandler/uploadImage");
 
 router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
-    const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer);
+    const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer,true);
 const PostFile = originalUrl;
 const PostFileThumbnail = blurredUrl;
 
