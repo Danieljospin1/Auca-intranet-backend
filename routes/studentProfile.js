@@ -8,6 +8,7 @@ const os = require('os')
 const path = require('path');
 require('dotenv').config();
 const uploadImage=require('../fileHandler/uploadImage');
+const upload=require('../fileHandler/upload')
 
 
 router.get('/', Authenticate, async (req, res) => {

@@ -6,6 +6,7 @@ const path = require('path')
 const os=require('os')
 const multer=require('multer')
 const uploadImage=require('../fileHandler/uploadImage');
+const upload=require('../fileHandler/upload')
 
 router.get('/',Authenticate,async(req,res)=>{
     const userID=req.user.Id;
