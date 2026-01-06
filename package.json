@@ -27,17 +27,14 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
+    "eslint": "^9.39.2",
     "nodemon": "^3.1.4"
   },
   "engines": {
-  "node": "20.x"
-},
-
+    "node": "20.x"
+  },
   "overrides": {
     "get-intrinsic": "1.2.4",
     "gopd": "1.0.1"
   }
-
-
-
 }
