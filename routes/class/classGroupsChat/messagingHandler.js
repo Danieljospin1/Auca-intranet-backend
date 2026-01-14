@@ -121,9 +121,15 @@ module.exports = async (io) => {
                                 try { socket.emit('newClasses', classMetadata); } catch (e) {/* ignore */ }
                             }
                         }
-                        //else send all classes a user belongs to...
-                        else{
-                            const [classMetadata] = await safeQuery(`
+
+                    } catch (err) {
+                        console.warn('[socket] error checking new class join for user', userId, err);
+                    }
+                }
+            }
+            //else send all classes a user belongs to...
+            else {
+                const [classMetadata] = await safeQuery(`
                                 SELECT cl.Id as ClassId, c.Name as ClassName, c.Code as CourseCode, g.GroupName, cl.ClassAvatar, cl.ClassStatus, r.MemberRole
                                 FROM courses c
                                 JOIN coursegroups g on c.CourseId = g.Id
@@ -131,12 +137,14 @@ module.exports = async (io) => {
                                 JOIN roommembership r on cl.Id = r.ClassId
                                 WHERE r.MemberId = ? and r.IsActive = ?
                               `, [userId, true]);
-                            try { socket.emit('newClasses', classMetadata); } catch (e) {/* ignore */}
-                        }
-                    } catch (err) {
-                        console.warn('[socket] error checking new class join for user', userId, err);
+                try { 
+                    if (Array.isArray(classMetadata) && classMetadata.length > 0) {
+                        socket.emit('newClasses', classMetadata); } 
+                        console.log("emitted all classes data")
                     }
-                }
+                    catch (e) {
+                        console.warn('[socket] emit newClasses failed', e);
+                    }
             }
 
             // --- fetch offline messages only if we have rooms ---
@@ -224,7 +232,7 @@ module.exports = async (io) => {
                         console.log("this is working", incomingMessageRows, messageTemporaryId)
                         socket.to(room).emit('messages', incomingMessageRows);
                         acknowledgment(incomingMessageRows, messageTemporaryId);
-                        
+
 
                     }
                 } catch (error) {
