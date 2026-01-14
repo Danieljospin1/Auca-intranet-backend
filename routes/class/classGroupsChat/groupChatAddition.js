@@ -66,6 +66,31 @@ router.post('/:classId/:memberId/', async (req, res) => {
         res.json({ "errror": "enter required data" })
     }
 })
+
+
+// route to get all class group meta data a user is member of
+// router.get('/', Authenticate, async (req, res) => {
+//     const memberId = req.user.Id;
+//     if (!memberId) {
+//         return res.status(400).json({ error: "Enter required data" });
+//     }
+//     try{
+//         const [userClasses] = await connectionPromise.query(
+//             `
+//                 SELECT cl.Id as ClassId, c.Name as ClassName, c.Code as CourseCode, g.GroupName, cl.ClassAvatar, cl.ClassStatus, r.MemberRole
+//                 FROM courses c
+//                 JOIN coursegroups g on c.CourseId = g.Id
+//                 JOIN classes cl on g.Id = cl.CourseGroupId
+//                 JOIN roommembership r on cl.Id = r.ClassId
+//                 WHERE r.MemberId = ? and r.IsActive = ? and r.JoiningDate = ?
+//               `, [memberId, true, r.JoiningDate])
+//         res.json(userClasses);
+//     }
+//     catch(error){
+//         console.error(error);
+//         res.status(500).json({ error: "An error occurred while retrieving user classes" });
+//     }
+// })
 // route to leave the class group for both students and lecturers
 router.delete('/', Authenticate, async (req, res) => {
     const { classId } = req.body;

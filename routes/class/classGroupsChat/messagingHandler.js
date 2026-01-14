@@ -121,6 +121,18 @@ module.exports = async (io) => {
                                 try { socket.emit('newClasses', classMetadata); } catch (e) {/* ignore */ }
                             }
                         }
+                        //else send all classes a user belongs to...
+                        else{
+                            const [classMetadata] = await safeQuery(`
+                                SELECT cl.Id as ClassId, c.Name as ClassName, c.Code as CourseCode, g.GroupName, cl.ClassAvatar, cl.ClassStatus, r.MemberRole
+                                FROM courses c
+                                JOIN coursegroups g on c.CourseId = g.Id
+                                JOIN classes cl on g.Id = cl.CourseGroupId
+                                JOIN roommembership r on cl.Id = r.ClassId
+                                WHERE r.MemberId = ? and r.IsActive = ?
+                              `, [userId, true]);
+                            try { socket.emit('newClasses', classMetadata); } catch (e) {/* ignore */}
+                        }
                     } catch (err) {
                         console.warn('[socket] error checking new class join for user', userId, err);
                     }
