@@ -9,6 +9,7 @@ const connectionPromise = require('../database & models/databaseConnection');
 
 router.post('/', async (req, res) => {
     const { Id, Password, isStaff } = req.body;
+    console.log("user received.......",req.body)
     if (!Id || !Password ) {
         res.json("message:Please input Your Id/Email And Password")
     }
