@@ -46,10 +46,14 @@ const uploadImage = require("../../../fileHandler/uploadImage");
 
 
 router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
+    let PostFile;
+    let PostFileThumbnail;
 
-    const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer,true);
-const PostFile = originalUrl;
-const PostFileThumbnail = blurredUrl;
+    if (req.file) {
+        const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer, true);
+        PostFile = originalUrl;
+        PostFileThumbnail = blurredUrl;
+    }
 
 
 
@@ -65,6 +69,7 @@ const PostFileThumbnail = blurredUrl;
 
 
     if (PostFile && PostFileThumbnail) {
+
         const fileType = path.extname(PostFile)
         const fileMimeType = req.file.mimetype;
         const fileSize = fileSizeFormat(req.file.size)
