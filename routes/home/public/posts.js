@@ -4,23 +4,46 @@ const connectionPromise = require('../../../database & models/databaseConnection
 const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
-const os = require('os')
 const fileSizeFormat = require('../../../utils/fileSizeFormat');
 const { Authenticate } = require('../../../Authentication/authentication')
-const { get } = require('../../../socketDirectory')
 const getPostById = require('../../../utils/getPosts');
 require('dotenv').config();
 
+// ==================== FIXED STORAGE PATH ====================
+// Use /tmp directory on Render (or current directory as fallback)
+const uploadBasePath = process.env.UPLOAD_PATH || path.join(__dirname, '../../../uploads');
+const postsFolderLocation = path.join(uploadBasePath, 'posts');
+const thumbNailFolderLocation = path.join(uploadBasePath, 'thumbnails');
 
-// storing images on server desktop
-const desktopFolderPath = path.join(os.homedir(), 'Desktop');
-const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-const postsFolderLocation = path.join(uploadFolderPath, 'posts')
-const thumbNailFolderLocation = path.join(uploadFolderPath, 'thumbnails');
+// Create directories if they don't exist
+const createUploadDirectories = () => {
+    try {
+        if (!fs.existsSync(uploadBasePath)) {
+            fs.mkdirSync(uploadBasePath, { recursive: true });
+            console.log('✅ Created upload base directory:', uploadBasePath);
+        }
+        if (!fs.existsSync(postsFolderLocation)) {
+            fs.mkdirSync(postsFolderLocation, { recursive: true });
+            console.log('✅ Created posts directory:', postsFolderLocation);
+        }
+        if (!fs.existsSync(thumbNailFolderLocation)) {
+            fs.mkdirSync(thumbNailFolderLocation, { recursive: true });
+            console.log('✅ Created thumbnails directory:', thumbNailFolderLocation);
+        }
+    } catch (error) {
+        console.error('❌ Error creating upload directories:', error);
+    }
+};
+
+// Create directories on server start
+createUploadDirectories();
 
 // defining image posts storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
+        // Ensure directories exist before each upload
+        createUploadDirectories();
+        
         if (file.fieldname == 'orgPostFile') {
             cb(null, postsFolderLocation)
         }
@@ -33,7 +56,38 @@ const storage = multer.diskStorage({
         cb(null, fileName)
     }
 })
-const upload = multer({ storage: storage });
+
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
+
+// ==================== SERVE UPLOADED FILES ====================
+// Serve post images
+router.get('/postImg/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filepath = path.join(postsFolderLocation, filename);
+    
+    if (fs.existsSync(filepath)) {
+        res.sendFile(filepath);
+    } else {
+        res.status(404).json({ error: 'Image not found' });
+    }
+});
+
+// Serve thumbnail images
+router.get('/postImg/thbnl/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filepath = path.join(thumbNailFolderLocation, filename);
+    
+    if (fs.existsSync(filepath)) {
+        res.sendFile(filepath);
+    } else {
+        res.status(404).json({ error: 'Thumbnail not found' });
+    }
+});
 
 // ==================== POST ROUTE - CREATE NEW POST ====================
 router.post('/', upload.fields([
@@ -82,6 +136,8 @@ router.post('/', upload.fields([
             const fileType = path.extname(PostFile);
             const fileMimeType = req.files?.orgPostFile?.[0]?.mimetype;
             const fileSize = fileSizeFormat(req.files?.orgPostFile?.[0]?.size);
+            
+            // Construct URLs - these will be served by the routes above
             const postImageUrl = `${process.env.serverIp}/home/posts/postImg/${path.basename(PostFile)}`;
             const postThumbnailUrl = `${process.env.serverIp}/home/posts/postImg/thbnl/${path.basename(PostFileThumbnail)}`;
             
@@ -127,7 +183,9 @@ router.post('/', upload.fields([
             success: true,
             message: 'Post created successfully',
             postId: PostId,
-            post: post // Include complete post data
+            post: post, // Include complete post data
+            thumbnailUrl: PostFileThumbnail ? `${process.env.serverIp}/home/posts/postImg/thbnl/${path.basename(PostFileThumbnail)}` : null,
+            fullUrl: PostFile ? `${process.env.serverIp}/home/posts/postImg/${path.basename(PostFile)}` : null
         });
 
     } catch (err) {
@@ -341,10 +399,42 @@ router.delete('/', Authenticate, async (req, res) => {
     }
     
     try {
+        // Get file paths before deleting from database
+        const [fileData] = await connectionPromise.query(
+            `SELECT FullUrl, ThumbnailUrl FROM postfiles WHERE PostId = ?`, 
+            [Id]
+        );
+        
+        // Delete the post (this will cascade delete postfiles due to foreign key)
         const [result] = await connectionPromise.query(`DELETE FROM posts WHERE Id = ?`, [Id]);
         
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Post not found' });
+        }
+        
+        // Delete actual files from disk
+        if (fileData.length > 0) {
+            const fullUrl = fileData[0].FullUrl;
+            const thumbnailUrl = fileData[0].ThumbnailUrl;
+            
+            // Extract filename from URL and delete file
+            if (fullUrl) {
+                const filename = path.basename(new URL(fullUrl).pathname);
+                const filepath = path.join(postsFolderLocation, filename);
+                if (fs.existsSync(filepath)) {
+                    fs.unlinkSync(filepath);
+                    console.log('Deleted post image:', filepath);
+                }
+            }
+            
+            if (thumbnailUrl) {
+                const filename = path.basename(new URL(thumbnailUrl).pathname);
+                const filepath = path.join(thumbNailFolderLocation, filename);
+                if (fs.existsSync(filepath)) {
+                    fs.unlinkSync(filepath);
+                    console.log('Deleted thumbnail image:', filepath);
+                }
+            }
         }
         
         res.status(200).json({ 
