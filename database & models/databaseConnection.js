@@ -3,11 +3,11 @@ const mysql=require('mysql2');
 require('dotenv').config();
 
 const DBconnection=mysql.createPool({
-  host:'localhost',
+  host:process.env.dbhost,
   user:process.env.dbroot,
   password:process.env.dbpassword,
   database:process.env.dbname,
-  port:3307,
+  port:35668,
   timezone: '+00:00'
   
 });
