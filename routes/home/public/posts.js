@@ -51,8 +51,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
     if (req.file) {
         const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer, true);
-        PostFile = originalUrl;
-        PostFileThumbnail = blurredUrl;
+        PostFile = originalUrl?originalUrl:null;
+        PostFileThumbnail = blurredUrl?blurredUrl:null;
     }
 
 
@@ -84,8 +84,12 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
             const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
+            if (!insert) {
+                return res.status(500).json({ message: 'Error creating post.' });
+            }
             const PostId = insert.insertId;
             console.log({ "this": PostId })
+
             console.log(fileType, PostFile, PostFileThumbnail, fileMimeType, fileSize)
 
 
@@ -105,6 +109,9 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                 if (audience == 'students') {
                     io.to('students').emit('newPost', post);
                 }
+            }
+            else {
+                console.log("Post not found for socket emission");
             }
         }
         catch (err) {
