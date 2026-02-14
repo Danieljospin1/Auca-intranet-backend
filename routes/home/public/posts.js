@@ -94,10 +94,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
 
 
-            await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]).then(
-                res.status(201).json({ message: `Post created successfully...`, postId: PostId })
-
-            )
+            await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]);
+            
             const post = await getPostById(PostId);
             if (post) {
                 if (audience == 'all') {
@@ -113,9 +111,20 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             else {
                 console.log("Post not found for socket emission");
             }
+            
+            // Send response AFTER everything completes with full post data
+            res.status(201).json({ 
+                message: `Post created successfully...`, 
+                postId: PostId,
+                post: post,
+                thumbnailUrl: PostFileThumbnail,
+                fullUrl: PostFile,
+                fileSize: fileSize
+            })
         }
         catch (err) {
             console.log(err)
+            return res.status(500).json({ message: 'Error creating post', error: err.message });
         }
     }
     else {
@@ -126,9 +135,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                 await connectionPromise.query("SET time_zone = '+00:00'");
                 // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
                 // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]).then(
-                    res.status(200).json({ message: `Post created successfully...`, postedById })
-                )
+                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
                 const PostId = insert.insertId;
                 // refetching the post to emit it to the socket
                 const post = await getPostById(PostId);
@@ -143,6 +150,14 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                         io.to('students').emit('newPost', post);
                     }
                 }
+                
+                // Send response AFTER everything completes
+                res.status(200).json({ 
+                    message: `Post created successfully...`, 
+                    postId: PostId,
+                    post: post,
+                    postedById 
+                })
 
             }
             else {
@@ -153,10 +168,9 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
         }
 
-        catch {
-            (err) => {
-                console.log(err);
-            }
+        catch (err) {
+            console.log(err);
+            return res.status(500).json({ message: 'Error creating post', error: err.message });
         }
 
     }
