@@ -357,6 +357,7 @@ router.get('/', Authenticate, async (req, res) => {
 
 router.delete('/', Authenticate, async (req, res) => {
     const Id = req.body.Id;
+    const io = req.app.get('io');
 
     if (!Id) {
         return res.status(400).json({ error: 'Post ID is required' });
@@ -368,6 +369,10 @@ router.delete('/', Authenticate, async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Post not found' });
         }
+
+        //  NEW: Emit socket event to notify all users
+        io.emit('postDeleted', { PostId: Id });
+        console.log('[Socket] Emitted postDeleted event for post:', Id);
 
         res.status(200).json({
             success: true,
