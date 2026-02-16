@@ -3,112 +3,152 @@ const router = express.Router()
 const connectionPromise = require('../../../database & models/databaseConnection')
 const {Authenticate} = require('../../../Authentication/authentication')
 
+// ✅ POST: Create a new comment
 router.post('/', Authenticate, async (req, res) => {
     const { postId, comment } = req.body;
     const userId = req.user.Id;
     const userRole = req.user.role;
-    const io = req.app.get('io');
+    
+    // ✅ FIX #1: Validate input
+    if (!postId || !comment || comment.trim() === '') {
+        return res.status(400).json({ 
+            "message": "Post ID and comment text are required" 
+        });
+    }
     
     try {
         // Check if post exists
-        const [checkPost] = await connectionPromise.query(`select * from posts where Id=?`, [postId]);
-        
-        if (!checkPost || checkPost.length === 0) {
-            return res.status(400).json({ "message": "This post is no longer available..." });
-        }
-
-        // Insert the comment
-        const [insertResult] = await connectionPromise.query(
-            `insert into comments (PostId,UserType,CommentedById,Text) values(?,?,?,?)`,
-            [postId, userRole, userId, comment]
-        );
-
-        const commentId = insertResult.insertId;
-
-        // Update post comment count
-        await connectionPromise.query(
-            `UPDATE posts SET PostComments = PostComments + 1 WHERE Id = ?`,
+        const [checkPost] = await connectionPromise.query(
+            `SELECT Id FROM posts WHERE Id=?`, 
             [postId]
         );
+        
+        // ✅ FIX #2: Proper array length check
+        if (!checkPost || checkPost.length === 0) {
+            return res.status(404).json({ 
+                "message": "This post is no longer available..." 
+            });
+        }
+        
+        // Insert comment
+        await connectionPromise.query(
+            `INSERT INTO comments (PostId, UserType, CommentedById, Text) VALUES (?, ?, ?, ?)`,
+            [postId, userRole, userId, comment.trim()]
+        );
+        
+        return res.status(200).json({ 
+            "message": "Comment posted successfully" 
+        });
+        
+    } catch (err) {
+        // ✅ FIX #3: Proper error handling
+        console.error('[POST /comments] Error posting comment:', err);
+        return res.status(500).json({ 
+            "message": "Failed to post comment",
+            "error": process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+    }
+});
 
-        // Fetch the complete comment with user details
-        const [newComment] = await connectionPromise.query(`
+// ✅ GET: Fetch comments for a specific post
+router.get('/', async (req, res) => {
+    const { postId } = req.query;
+    
+    // ✅ FIX #4: Validate postId parameter
+    if (!postId) {
+        return res.status(400).json({ 
+            "message": "Post ID is required" 
+        });
+    }
+    
+    try {
+        const [comments] = await connectionPromise.query(`
             SELECT 
                 c.Id,
+                c.PostId,
                 c.Text,
                 c.Timestamp,
                 c.UserType,
-                c.PostId,
                 CASE 
-                    WHEN UserType = 'student' THEN CONCAT(s.Fname, ' ', s.Lname)
+                    WHEN c.UserType = 'student' THEN CONCAT(s.Fname, ' ', s.Lname)
                     ELSE CONCAT(st.Fname, ' ', st.Lname)
                 END as commentorNames,
                 CASE
-                    WHEN UserType='student' THEN s.ProfileUrl
+                    WHEN c.UserType = 'student' THEN s.ProfileUrl
                     ELSE st.ProfileUrl
                 END as commentorProfile
-            FROM comments c
-            LEFT JOIN students s ON s.StudentId = c.CommentedById AND UserType = 'student'
-            LEFT JOIN staff st ON st.Id = c.CommentedById AND UserType = 'staff' 
-            WHERE c.Id = ?
-        `, [commentId]);
-
-        // Get updated comment count
-        const [postData] = await connectionPromise.query(
-            `SELECT PostComments FROM posts WHERE Id = ?`,
-            [postId]
-        );
-
-        // ✅ Emit socket event for real-time comment updates
-        if (newComment && newComment.length > 0) {
-            io.emit('commentAdded', {
-                PostId: postId,
-                comment: newComment[0],
-                commentCount: postData[0].PostComments
-            });
-            console.log('[Socket] Emitted commentAdded event for post:', postId);
-        }
-
-        res.status(200).json({ 
-            message: "comment posted successfully...",
-            comment: newComment[0],
-            commentCount: postData[0].PostComments
-        });
-
+            FROM 
+                comments c
+            LEFT JOIN 
+                students s ON s.StudentId = c.CommentedById AND c.UserType = 'student'
+            LEFT JOIN 
+                staff st ON st.Id = c.CommentedById AND c.UserType = 'staff' 
+            WHERE c.PostId = ?
+            ORDER BY c.Timestamp DESC
+        `, [postId]);
+        
+        // ✅ Always return an array (even if empty)
+        return res.status(200).json(comments || []);
+        
     } catch (err) {
-        console.error('Error posting comment:', err);
-        res.status(500).json({ message: err.message || "Error posting comment" });
+        // ✅ FIX #5: Proper error handling with logging
+        console.error(`[GET /comments] Error fetching comments for post ${postId}:`, err);
+        return res.status(500).json({ 
+            "message": "Failed to fetch comments",
+            "error": process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     }
-})
-router.get('/', async (req, res) => {
-    const {postId} = req.query
+});
+
+// ✅ DELETE: Delete a comment (bonus feature for future use)
+router.delete('/:commentId', Authenticate, async (req, res) => {
+    const { commentId } = req.params;
+    const userId = req.user.Id;
+    const userRole = req.user.role;
+    
+    if (!commentId) {
+        return res.status(400).json({ 
+            "message": "Comment ID is required" 
+        });
+    }
+    
     try {
-        const [comments] = await connectionPromise.query(`SELECT 
-c.Id,
-c.Text,
-c.Timestamp,
-c.UserType,
-CASE 
-    WHEN UserType = 'student' THEN CONCAT(s.Fname, ' ', s.Lname)
-    ELSE CONCAT(st.Fname, ' ', st.Lname)
-END as commentorNames,
-CASE
-WHEN UserType='student' THEN s.ProfileUrl
-ELSE st.ProfileUrl
-END as commentorProfile
-FROM 
-comments c
-LEFT JOIN 
-students s ON s.StudentId = c.CommentedById AND UserType = 'student'
-LEFT JOIN 
-staff st ON st.Id = c.CommentedById AND UserType = 'staff' where PostId=? order by c.Timestamp asc`,[postId])
-        res.json(comments)
-    }
-    catch {
-        (err) => {
-            console.log(err)
+        // Check if comment exists and belongs to the user
+        const [comment] = await connectionPromise.query(
+            `SELECT CommentedById, UserType FROM comments WHERE Id = ?`,
+            [commentId]
+        );
+        
+        if (!comment || comment.length === 0) {
+            return res.status(404).json({ 
+                "message": "Comment not found" 
+            });
         }
+        
+        // Verify ownership
+        if (comment[0].CommentedById !== userId.toString()) {
+            return res.status(403).json({ 
+                "message": "You can only delete your own comments" 
+            });
+        }
+        
+        // Delete the comment
+        await connectionPromise.query(
+            `DELETE FROM comments WHERE Id = ?`,
+            [commentId]
+        );
+        
+        return res.status(200).json({ 
+            "message": "Comment deleted successfully" 
+        });
+        
+    } catch (err) {
+        console.error(`[DELETE /comments] Error deleting comment ${commentId}:`, err);
+        return res.status(500).json({ 
+            "message": "Failed to delete comment",
+            "error": process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     }
-})
+});
+
 module.exports = router;
-//
