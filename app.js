@@ -26,7 +26,7 @@ const classWorksFileHandler = require('./routes/FileHandlers/classWorksFile')
 const notification = require('./routes/notifications/notifications')
 const postImgThumbnail = require('./routes/FileHandlers/postThumbnail')
 const classResourceFiles = require('./routes/FileHandlers/classResources')
-const register = require('./routes/register')
+
 require('dotenv').config()
 
 //  CREATE HTTP SERVER FIRST
@@ -71,7 +71,6 @@ app.get('/health', (req, res) => {
 })
 
 //  ROUTES
-app.use('/register', register)
 app.use('/login', login)
 app.use('/student/profile', studentProfile)
 app.use('/staff/profile', staffProfile)
