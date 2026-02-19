@@ -137,14 +137,15 @@ module.exports = async (io) => {
                                 JOIN roommembership r on cl.Id = r.ClassId
                                 WHERE r.MemberId = ? and r.IsActive = ?
                               `, [userId, true]);
-                try { 
+                try {
                     if (Array.isArray(classMetadata) && classMetadata.length > 0) {
-                        socket.emit('newClasses', classMetadata); } 
-                        console.log("emitted all classes data")
+                        socket.emit('newClasses', classMetadata);
                     }
-                    catch (e) {
-                        console.warn('[socket] emit newClasses failed', e);
-                    }
+                    console.log("emitted all classes data")
+                }
+                catch (e) {
+                    console.warn('[socket] emit newClasses failed', e);
+                }
             }
 
             // --- fetch offline messages only if we have rooms ---
@@ -251,8 +252,8 @@ module.exports = async (io) => {
                     }
                     await safeQuery('update messages set IsPinned=? where Id=? and ClassId=?', [1, MessageId, ClassId]);
                     console.log(typeof (ClassId))
-                    socket.to(String(ClassId)).emit("messagePin", { ClassId, MessageId })
-                    console.log("updated message pinning successfully!!!")
+                    socket.to(String(ClassId)).emit("messagePin",  { ClassId, MessageId });
+                    console.log("emitted message pinning successfully!!!",{ ClassId, MessageId })
                 }
                 catch (err) {
                     console.log(err)
