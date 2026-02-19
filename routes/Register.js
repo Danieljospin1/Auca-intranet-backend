@@ -5,8 +5,8 @@ const connectionPromise = require('../database & models/databaseConnection');
 
 /**
  * POST /register
- * students: StudentId, Fname, Lname, Email, Phone(int), Faculty, Department, StudyLevel, Password
- * staff:    Fname, Lname, Email, Phone(int), Department, Role, Password  (Id is auto_increment)
+ * students: StudentId, Fname, Lname, Email, Phone (int), Faculty, Department, StudyLevel, Password
+ * staff:    Fname, Lname, Email, Phone (int), Faculty, Department, Role, Password  (Id is auto_increment)
  */
 router.post('/', async (req, res) => {
     const {
@@ -24,7 +24,7 @@ router.post('/', async (req, res) => {
 
     console.log('[Register] Request received:', { userRole, id, email });
 
-    
+   
     if (!userRole || !fullName || !email || !phone || !password || !confirmPassword || !faculty || !department) {
         return res.status(400).json({ message: 'All fields are required' });
     }
@@ -59,6 +59,9 @@ router.post('/', async (req, res) => {
             if (!studyLevel) {
                 return res.status(400).json({ message: 'Study level is required' });
             }
+            if (!faculty) {
+                return res.status(400).json({ message: 'Faculty is required' });
+            }
 
             // Duplicate check
             const [existing] = await connectionPromise.query(
@@ -80,7 +83,7 @@ router.post('/', async (req, res) => {
             return res.status(201).json({ message: 'Registration successful! Please log in.' });
         }
 
-       
+        
         if (userRole === 'staff') {
 
             // Duplicate check — Email is UNIQUE in staff
@@ -95,16 +98,16 @@ router.post('/', async (req, res) => {
             // Id is auto_increment — do NOT insert it
             await connectionPromise.query(
                 `INSERT INTO staff
-                    (Fname, Lname, Email, Phone, Department, Role, Password, ProfileUrl)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-                [Fname, Lname, email, phoneNumber, department, 'Lecturer', password]
+                    (Fname, Lname, Email, Phone, Faculty, Department, Role, Password, ProfileUrl)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+                [Fname, Lname, email, phoneNumber, faculty, department, 'Lecturer', password]
             );
 
             console.log('[Register] Staff created:', email);
             return res.status(201).json({ message: 'Registration successful! Please log in.' });
         }
 
-        return res.status(400).json({ message: 'Invalid userRole' });
+        return res.status(400).json({ message: 'Invalid userRole. Must be "student" or "staff".' });
 
     } catch (err) {
         console.error('[Register] DB error:', err);

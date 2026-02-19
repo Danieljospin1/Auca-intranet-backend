@@ -3,7 +3,7 @@ const app = express()
 const port = process.env.PORT || 3000
 const socketIo = require('socket.io')
 const http = require('http')
-const cors = require('cors') 
+const cors = require('cors')
 const socketRoutes = require('./routes/class/classGroupsChat/messagingHandler')
 const bodyParser = require('body-parser')
 const login = require('./routes/logIn')
@@ -26,18 +26,17 @@ const classWorksFileHandler = require('./routes/FileHandlers/classWorksFile')
 const notification = require('./routes/notifications/notifications')
 const postImgThumbnail = require('./routes/FileHandlers/postThumbnail')
 const classResourceFiles = require('./routes/FileHandlers/classResources')
-const register = require('./routes/Register')
-
+const register = require('./routes/Register')  
 
 require('dotenv').config()
 
-//  CREATE HTTP SERVER FIRST
+// CREATE HTTP SERVER FIRST
 const socketServer = http.createServer(app)
 
-//  CONFIGURE SOCKET.IO WITH CORS
+// CONFIGURE SOCKET.IO WITH CORS
 const io = socketIo(socketServer, {
   cors: {
-    origin: "*", // In production, replace with your app's domain
+    origin: "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
     allowedHeaders: ["Authorization", "Content-Type"]
@@ -47,33 +46,33 @@ const io = socketIo(socketServer, {
   pingInterval: 25000
 })
 
-io.use(socketAuthenticate) // authentication middleware
+io.use(socketAuthenticate)
 socketRoutes(io)
-app.set('io', io) // setting io instance in express
+app.set('io', io)
 
-//  ENABLE CORS FOR EXPRESS
+// ENABLE CORS FOR EXPRESS
 app.use(cors({
-  origin: "*", // In production, specify your app's domain
+  origin: "*",
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 }))
 
-//  BODY PARSER
+// BODY PARSER
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
-//  HEALTH CHECK ENDPOINT (for testing)
+// HEALTH CHECK ENDPOINT
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     message: 'Backend is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   })
 })
 
-//  ROUTES
-app.use('/Register', register)
+// ROUTES
+app.use('/register', register)                                    // ✅ ADDED: lowercase, matches client POST /register
 app.use('/login', login)
 app.use('/student/profile', studentProfile)
 app.use('/staff/profile', staffProfile)
@@ -94,24 +93,24 @@ app.use('/home/posts', postsFileHandler)
 app.use('/home/posts', postImgThumbnail)
 app.use('/notifications', notification)
 
-//  ERROR HANDLING MIDDLEWARE
+// ERROR HANDLING MIDDLEWARE
 app.use((err, req, res, next) => {
   console.error('Error:', err)
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
-    message: err.message 
+    message: err.message
   })
 })
 
-//  START SERVER
+// START SERVER
 const Start = () => {
   try {
     socketServer.listen(port, '0.0.0.0', () => {
-      console.log(` Server is listening on port ${port}`)
-      console.log(` Environment: ${process.env.NODE_ENV || 'development'}`)
+      console.log(`Server is listening on port ${port}`)
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`)
     })
   } catch (err) {
-    console.error(' Server start error:', err)
+    console.error('Server start error:', err)
   }
 }
 
