@@ -32,16 +32,16 @@ router.patch('/', Authenticate, async (req, res) => {
     try {
         if (Phone && Email) {
             const [userProfile] = await connectionPromise.query(`update students set Phone=?,Email=? where studentId=? `,[Phone,Email,StudentId])
-            res.send("email and phone updated...")
+            res.status(200).send("email and phone updated...")
         }
         if (Phone && !Email) {
             const [userProfile] = await connectionPromise.query(`update students set Phone=? where StudentId=?`,[Phone,StudentId]);
-            res.send("phone updated...")
+            res.status(200).send("phone updated...")
         }
 
         if (!Phone && Email) {
-            const [userProfile] = await connectionPromise.query(`update students set Email=? where StudentId=?}`,[Email,StudentId]);
-            res.send("Email updated...")
+            const [userProfile] = await connectionPromise.query(`update students set Email=? where StudentId=?`,[Email,StudentId]);
+            res.status(200).send("Email updated...")
 
 
 
@@ -50,7 +50,9 @@ router.patch('/', Authenticate, async (req, res) => {
             res.status(400).json({ message: "there is no new email or new phone number you have entered " });
         }
     }
-    catch { (err) => { res.status(500).json({ message: err.message }) } }
+    catch (err) {
+        res.status(500).json({ message: err.message })
+    }
 })
 // the following is the route to upload profile for students
 // we will use multer to handle image file uploads

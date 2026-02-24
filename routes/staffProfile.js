@@ -63,5 +63,38 @@ router.post('/',upload.single('profile'),Authenticate,async(req,res)=>{
     }}
 
 })
+router.patch('/',Authenticate,async(req,res)=>{
+    const userId=req.user.Id;
+    const {Email,PhoneNumber}=req.body;
+    try{
+        if(!Email && !PhoneNumber){
+            return res.status(400).json({message:"Please provide at least one field to update"});
+        }
+        if(Email && !PhoneNumber){
+            await connectionPromise.query(`update staff set Email=? where Id=?`,[Email,userId]).then(
+                res.status(200).send('Email updated successfully')
+            ).catch((err)=>{
+                res.status(500).json({ message: err.message })
+            })
+        }
+        if(PhoneNumber && !Email){
+            await connectionPromise.query(`update staff set PhoneNumber=? where Id=?`,[PhoneNumber,userId]).then(
+                res.status(200).send('Phone number updated successfully')
+            ).catch((err)=>{
+                res.status(500).json({ message: err.message })
+            })
+        }
+        if(Email && PhoneNumber){
+            await connectionPromise.query(`update staff set Email=?,PhoneNumber=? where Id=?`,[Email,PhoneNumber,userId]).then(
+                res.status(200).send('Email and Phone number updated successfully')
+            ).catch((err)=>{
+                res.status(500).json({ message: err.message })
+            })
+        }
+    }
+    catch(error){
+        res.status(500).json({ message: error.message })
+    }
+})
 
 module.exports=router;
