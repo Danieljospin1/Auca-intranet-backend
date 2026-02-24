@@ -63,7 +63,7 @@ router.patch('/', Authenticate, async (req, res) => {
     try {
         if (Email && PhoneNumber) {
             await connectionPromise.query(
-                `update staff set Email=?,PhoneNumber=? where Id=?`,
+                `update staff set Email=?,Phone=? where Id=?`,
                 [Email, PhoneNumber, userId]
             );
             return res.status(200).send('Email and Phone number updated successfully');
@@ -73,7 +73,7 @@ router.patch('/', Authenticate, async (req, res) => {
             return res.status(200).send('Email updated successfully');
         }
         if (!Email && PhoneNumber) {
-            await connectionPromise.query(`update staff set PhoneNumber=? where Id=?`, [PhoneNumber, userId]);
+            await connectionPromise.query(`update staff set Phone=? where Id=?`, [PhoneNumber, userId]);
             return res.status(200).send('Phone number updated successfully');
         }
     } catch (err) {
