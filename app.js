@@ -26,6 +26,7 @@ const classWorksFileHandler = require('./routes/FileHandlers/classWorksFile')
 const notification = require('./routes/notifications/notifications')
 const postImgThumbnail = require('./routes/FileHandlers/postThumbnail')
 const classResourceFiles = require('./routes/FileHandlers/classResources')
+const courseRegistration = require('./routes/courseRegistration')
 const register = require('./routes/Register')  
 
 require('dotenv').config()
@@ -72,7 +73,7 @@ app.get('/health', (req, res) => {
 })
 
 // ROUTES
-app.use('/register', register)                                    // ✅ ADDED: lowercase, matches client POST /register
+app.use('/register', register)                                    //  ADDED: lowercase, matches client POST /register
 app.use('/login', login)
 app.use('/student/profile', studentProfile)
 app.use('/staff/profile', staffProfile)
@@ -92,6 +93,7 @@ app.use('/staff/imgProfile', staffProfileHandler)
 app.use('/home/posts', postsFileHandler)
 app.use('/home/posts', postImgThumbnail)
 app.use('/notifications', notification)
+app.use('/courses', courseRegistration)
 
 // ERROR HANDLING MIDDLEWARE
 app.use((err, req, res, next) => {
