@@ -7,7 +7,7 @@ const DBconnection=mysql.createPool({
   user:process.env.dbroot,
   password:process.env.dbpassword,
   database:process.env.dbname,
-  port:24831,
+  port:process.env.dbport,
   timezone: '+00:00'
   
 });
