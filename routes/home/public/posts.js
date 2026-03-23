@@ -65,6 +65,62 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     const io = req.app.get('io');
 
 
+    // ── helper: send to alumni via Brevo ──────────────────────────────
+    async function sendToAlumni(subject, message) {
+        const db = await connectionPromise;
+        const [alumniList] = await db.query(
+            `SELECT Names, Email FROM alumni WHERE OptedOut = FALSE`
+        );
+
+        if (alumniList.length === 0) return { sent: 0, failed: 0 };
+
+        let sent = 0, failed = 0;
+
+        for (const person of alumniList) {
+            try {
+                const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+                    method: 'POST',
+                    headers: {
+                        'api-key': process.env.BREVO_API_KEY,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sender: {
+                            name: 'AUCA Communications',
+                            email: 'danieljospin087@gmail.com'
+                        },
+                        to: [{ email: person.Email, name: person.Names }],
+                        subject: subject,
+                        htmlContent: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
+                                <h2 style="color: #003366;">AUCA Communications</h2>
+                                <p style="font-size: 15px; line-height: 1.6;">${message}</p>
+                                <hr style="margin-top: 30px;"/>
+                                <small style="color: #999;">
+                                    You are receiving this as an AUCA alumnus.
+                                    <a href="${process.env.APP_URL}/unsubscribe?email=${encodeURIComponent(person.Email)}">
+                                        Unsubscribe
+                                    </a>
+                                </small>
+                            </div>
+                        `,
+                    }),
+                });
+
+                response.ok ? sent++ : failed++;
+
+            } catch (err) {
+                console.error(`Failed to send to ${person.Email}:`, err.message);
+                failed++;
+            }
+        }
+        console.log(`Email sending completed. Sent: ${sent}, Failed: ${failed}`);
+
+        return { sent, failed };
+    }
+    // ─────────────────────────────────────────────────────────────────
+
+
 
 
 
@@ -96,6 +152,21 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
 
             await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]);
+
+             // ── socket or email based on audience ──
+            if (audience === 'alumni') {
+                const { sent, failed } = await sendToAlumni(
+                    'New announcement from AUCA',
+                    description
+                );
+                return res.status(201).json({
+                    message: 'Post created and emails sent to alumni',
+                    postId: PostId,
+                    post,
+                    emailsSent: sent,
+                    emailsFailed: failed
+                });
+            }
 
             const post = await getPostById(PostId);
             if (post) {
@@ -142,6 +213,21 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                 await connectionPromise.query(`insert into postaudience(PostId,AudienceType) values (?,?)`, [PostId, audience]);
                 // refetching the post to emit it to the socket
                 const post = await getPostById(PostId);
+
+                // ── socket or email based on audience ──
+                if (audience === 'alumni') {
+                    const { sent, failed } = await sendToAlumni(
+                        'New announcement from AUCA',
+                        description
+                    );
+                    return res.status(201).json({
+                        message: 'Post created and emails sent to alumni',
+                        postId: PostId,
+                        post,
+                        emailsSent: sent,
+                        emailsFailed: failed
+                    });
+                }
                 if (post) {
                     if (audience == 'all') {
                         io.to('all').emit('newPost', post);
