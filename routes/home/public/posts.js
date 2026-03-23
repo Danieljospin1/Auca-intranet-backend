@@ -83,11 +83,12 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
             // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
             // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-            const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
+            const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
             if (!insert) {
                 return res.status(500).json({ message: 'Error creating post.' });
             }
             const PostId = insert.insertId;
+            await connectionPromise.query(`insert into postaudience(PostId,AudienceType) values (?,?)`, [PostId, audience]);
             console.log({ "this": PostId })
 
             console.log(fileType, PostFile, PostFileThumbnail, fileMimeType, fileSize)
@@ -135,8 +136,9 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                 await connectionPromise.query("SET time_zone = '+00:00'");
                 // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
                 // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy,Audience) values (?,?,?,?)`, [postedById, description, role, audience]);
+                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
                 const PostId = insert.insertId;
+                await connectionPromise.query(`insert into postaudience(PostId,AudienceType) values (?,?)`, [PostId, audience]);
                 // refetching the post to emit it to the socket
                 const post = await getPostById(PostId);
                 if (post) {
