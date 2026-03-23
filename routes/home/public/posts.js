@@ -51,8 +51,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
     if (req.file) {
         const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer, true);
-        PostFile = originalUrl?originalUrl:null;
-        PostFileThumbnail = blurredUrl?blurredUrl:null;
+        PostFile = originalUrl ? originalUrl : null;
+        PostFileThumbnail = blurredUrl ? blurredUrl : null;
     }
 
 
@@ -96,7 +96,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
 
             await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]);
-            
+
             const post = await getPostById(PostId);
             if (post) {
                 if (audience == 'all') {
@@ -112,10 +112,10 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             else {
                 console.log("Post not found for socket emission");
             }
-            
+
             // Send response AFTER everything completes with full post data
-            res.status(201).json({ 
-                message: `Post created successfully...`, 
+            res.status(201).json({
+                message: `Post created successfully...`,
                 postId: PostId,
                 post: post,
                 thumbnailUrl: PostFileThumbnail,
@@ -138,6 +138,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                 // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
                 const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
                 const PostId = insert.insertId;
+                console.log({ "this.....": PostId })
                 await connectionPromise.query(`insert into postaudience(PostId,AudienceType) values (?,?)`, [PostId, audience]);
                 // refetching the post to emit it to the socket
                 const post = await getPostById(PostId);
@@ -152,13 +153,13 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                         io.to('students').emit('newPost', post);
                     }
                 }
-                
+
                 // Send response AFTER everything completes
-                res.status(200).json({ 
-                    message: `Post created successfully...`, 
+                res.status(200).json({
+                    message: `Post created successfully...`,
                     postId: PostId,
                     post: post,
-                    postedById 
+                    postedById
                 })
 
             }
@@ -211,49 +212,50 @@ router.get('/', Authenticate, async (req, res) => {
 
             const query = `
                 SELECT 
-                    p.Id,
-                    CASE 
-                        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
-                        ELSE st.Id 
-                    END AS CreatorId,
-                    CASE 
-                        WHEN s.StudentId IS NOT NULL THEN s.Fname 
-                        ELSE st.Fname 
-                    END AS Fname,   
-                    CASE 
-                        WHEN s.StudentId IS NOT NULL THEN s.Lname 
-                        ELSE st.Lname 
-                    END AS Lname,
-                    CASE 
-                        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
-                        ELSE st.ProfileUrl 
-                    END AS ProfileUrl,
-                    CASE 
-                        WHEN s.StudentId IS NOT NULL THEN 'Student' 
-                        ELSE st.Role 
-                    END AS Role,
-                    p.Description,
-                    p.Timestamp,
-                    f.FileType,
-                    f.ThumbnailUrl,
-                    f.FullUrl,
-                    f.FileSize,
-                    p.Audience as AudienceType,
-                    st.Department,
-                    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
-                    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
-                    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS PostComments
-                FROM posts p
-                LEFT JOIN students s ON p.CreatorId = s.StudentId
-                LEFT JOIN staff st ON p.CreatorId = st.Id
-                LEFT JOIN postfiles f ON p.Id = f.PostId
-                WHERE (p.Audience = ? OR p.Audience = 'all') 
-                    AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
-                GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
-                         st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-                         p.CreatorId, p.Description, p.Timestamp, f.FileType,
-                         f.ThumbnailUrl, f.FullUrl, f.FileSize, p.Audience,st.Department
-                ORDER BY p.Timestamp DESC
+    p.Id,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
+        ELSE st.Id 
+    END AS CreatorId,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.Fname 
+        ELSE st.Fname 
+    END AS Fname,   
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.Lname 
+        ELSE st.Lname 
+    END AS Lname,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
+        ELSE st.ProfileUrl 
+    END AS ProfileUrl,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN 'Student' 
+        ELSE st.Role 
+    END AS Role,
+    p.Description,
+    p.Timestamp,
+    f.FileType,
+    f.ThumbnailUrl,
+    f.FullUrl,
+    f.FileSize,
+    pa.AudienceType,
+    st.Department,
+    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
+    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
+    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS PostComments
+FROM posts p
+LEFT JOIN students s ON p.CreatorId = s.StudentId
+LEFT JOIN staff st ON p.CreatorId = st.Id
+LEFT JOIN postfiles f ON p.Id = f.PostId
+INNER JOIN postaudience pa ON pa.PostId = p.Id
+WHERE (pa.AudienceType = ? OR pa.AudienceType = 'all')
+    AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
+GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
+         st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
+         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
+ORDER BY p.Timestamp DESC
             `;
 
             console.log('Executing query with params:', [userRole, userLastOnlineDate]);
