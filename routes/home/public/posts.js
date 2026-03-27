@@ -169,7 +169,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             const fileSize     = fileSizeFormat(req.file.size);
 
             await connectionPromise.query(
-                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize, ResourceType)
+                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize, FileType)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize, PostFileResourceType]
             );
