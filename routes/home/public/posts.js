@@ -25,26 +25,77 @@ const uploadImage = require("../../../fileHandler/uploadFile");
 router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     let PostFile;
     let PostFileThumbnail;
+    let PostFileResourceType;
 
     if (req.file) {
-        const { originalUrl, thumbnailUrl, blurredUrl,resourceType } = await uploadImage(req.file.buffer, true, req.file.mimetype, req.file.originalname);
+        const { originalUrl, thumbnailUrl, blurredUrl, resourceType } = await uploadImage(
+            req.file.buffer, true, req.file.mimetype, req.file.originalname
+        );
         console.log('Upload result........:', { originalUrl, thumbnailUrl, blurredUrl, resourceType });
 
-        PostFile = originalUrl ? originalUrl : null;
-        PostFileThumbnail = blurredUrl ? blurredUrl : thumbnailUrl ? thumbnailUrl : null;
+        PostFile             = originalUrl  || null;
+        PostFileThumbnail    = blurredUrl   || thumbnailUrl || null;
+        PostFileResourceType = resourceType || null;
     }
 
-
-
-
-
     const { description, audience } = req.body;
+
+    // Parse audienceList — app sends it as a JSON string via FormData
+    let audienceList = [];
+    if (req.body.audienceList) {
+        try {
+            audienceList = JSON.parse(req.body.audienceList);
+            if (!Array.isArray(audienceList)) audienceList = [];
+        } catch {
+            audienceList = [];
+        }
+    }
+
     const postedById = req.user.Id;
-    const role = req.user.role;
-    const io = req.app.get('io');
+    const role       = req.user.role;
+    const io         = req.app.get('io');
 
+    // ── helper: insert audience into postaudience table ──────────────
+    //
+    // Everything lives in the same postaudience table as AudienceType.
+    //
+    // Case 1 — students WITH precision targets:
+    //   Don't store 'students'. Instead insert one row per target
+    //   e.g. ['Software Engineering', 'Marketing'] → 2 rows
+    //
+    // Case 2 — all other audiences OR students with no targets:
+    //   Insert a single row with the broad type (original behavior)
+    //
+    async function insertAudience(PostId) {
+        const isPrecisionTargeted = audience === 'students' && audienceList.length > 0;
 
-    // ── helper: send to alumni via Brevo ──────────────────────────────
+        if (isPrecisionTargeted) {
+            const values = audienceList.map(target => [PostId, target]);
+            await connectionPromise.query(
+                `INSERT INTO postaudience (PostId, AudienceType) VALUES ?`,
+                [values]
+            );
+            console.log(`Precision audience stored for post ${PostId}:`, audienceList);
+        } else {
+            await connectionPromise.query(
+                `INSERT INTO postaudience (PostId, AudienceType) VALUES (?, ?)`,
+                [PostId, audience]
+            );
+            console.log(`Broad audience stored for post ${PostId}:`, audience);
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────
+
+    // ── helper: emit socket to correct room ──────────────────────────
+    function emitPost(post) {
+        if (!post) return console.log("Post not found for socket emission");
+        if (audience === 'all')      io.to('all').emit('newPost', post);
+        if (audience === 'staff')    io.to('staff').emit('newPost', post);
+        if (audience === 'students') io.to('students').emit('newPost', post);
+    }
+    // ─────────────────────────────────────────────────────────────────
+
+    // ── helper: send to alumni via Brevo ─────────────────────────────
     async function sendToAlumni(subject, message) {
         const db = await connectionPromise;
         const [alumniList] = await db.query(
@@ -64,12 +115,9 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        sender: {
-                            name: 'AUCA Communications',
-                            email: 'danieljospin087@gmail.com'
-                        },
+                        sender: { name: 'AUCA Communications', email: 'danieljospin087@gmail.com' },
                         to: [{ email: person.Email, name: person.Names }],
-                        subject: subject,
+                        subject,
                         htmlContent: `
                             <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
                                 <h2 style="color: #003366;">AUCA Communications</h2>
@@ -77,179 +125,96 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                                 <hr style="margin-top: 30px;"/>
                                 <small style="color: #999;">
                                     You are receiving this as an AUCA alumnus.
-                                    <a href="${process.env.APP_URL}/unsubscribe?email=${encodeURIComponent(person.Email)}">
-                                        Unsubscribe
-                                    </a>
+                                    <a href="${process.env.APP_URL}/unsubscribe?email=${encodeURIComponent(person.Email)}">Unsubscribe</a>
                                 </small>
                             </div>
                         `,
                     }),
                 });
-
                 response.ok ? sent++ : failed++;
-
             } catch (err) {
                 console.error(`Failed to send to ${person.Email}:`, err.message);
                 failed++;
             }
         }
-        console.log(`Email sending completed. Sent: ${sent}, Failed: ${failed}`);
 
+        console.log(`Email sending completed. Sent: ${sent}, Failed: ${failed}`);
         return { sent, failed };
     }
     // ─────────────────────────────────────────────────────────────────
 
+    try {
+        await connectionPromise.query("SET time_zone = '+00:00'");
 
+        if (!description || !audience) {
+            return res.status(400).json({ message: 'Please provide all required fields.' });
+        }
 
+        // ── 1. Create the post ────────────────────────────────────────
+        const [insert] = await connectionPromise.query(
+            `INSERT INTO posts (CreatorId, Description, PostedBy) VALUES (?, ?, ?)`,
+            [postedById, description, role]
+        );
+        if (!insert) return res.status(500).json({ message: 'Error creating post.' });
 
+        const PostId = insert.insertId;
 
-    if (PostFile && PostFileThumbnail) {
+        // ── 2. Store audience ─────────────────────────────────────────
+        await insertAudience(PostId);
 
-        const fileType = path.extname(PostFile)
-        const fileMimeType = req.file.mimetype;
-        const fileSize = fileSizeFormat(req.file.size)
-        console.log(fileType, PostFile, PostFileThumbnail, fileMimeType, fileSize)
+        // ── 3. Store file if attached ─────────────────────────────────
+        if (PostFile) {
+            const fileType     = path.extname(PostFile);
+            const fileMimeType = req.file.mimetype;
+            const fileSize     = fileSizeFormat(req.file.size);
 
+            await connectionPromise.query(
+                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize, ResourceType)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize, PostFileResourceType]
+            );
+        }
 
-
-        try {
-            await connectionPromise.query("SET time_zone = '+00:00'");
-
-
-            // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
-            // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-            const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
-            if (!insert) {
-                return res.status(500).json({ message: 'Error creating post.' });
-            }
-            const PostId = insert.insertId;
-            await connectionPromise.query(`insert into postaudience(PostId,AudienceType) values (?,?)`, [PostId, audience]);
-            console.log({ "this": PostId })
-
-            console.log(fileType, PostFile, PostFileThumbnail, fileMimeType, fileSize)
-
-
-
-            await connectionPromise.query(`insert into postfiles(PostId,FileType,ThumbnailUrl,FullUrl,MimeType,FileSize) values (?,?,?,?,?,?)`, [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]);
-
-             // ── socket or email based on audience ──
-            if (audience === 'alumni') {
-                const { sent, failed } = await sendToAlumni(
-                    'New announcement from AUCA',
-                    description
-                );
-                return res.status(201).json({
-                    message: 'Post created and emails sent to alumni',
-                    postId: PostId,
-                    post,
-                    emailsSent: sent,
-                    emailsFailed: failed
-                });
-            }
-
-            const post = await getPostById(PostId);
-            if (post) {
-                if (audience == 'all') {
-                    io.to('all').emit('newPost', post);
-                }
-                if (audience == 'staff') {
-                    io.to('staff').emit('newPost', post);
-                }
-                if (audience == 'students') {
-                    io.to('students').emit('newPost', post);
-                }
-            }
-            else {
-                console.log("Post not found for socket emission");
-            }
-
-            // Send response AFTER everything completes with full post data
-            res.status(201).json({
-                message: `Post created successfully...`,
+        // ── 4. Alumni: send emails instead of socket ──────────────────
+        if (audience === 'alumni') {
+            const { sent, failed } = await sendToAlumni('New announcement from AUCA', description);
+            return res.status(201).json({
+                message: 'Post created and emails sent to alumni',
                 postId: PostId,
-                post: post,
-                thumbnailUrl: PostFileThumbnail,
-                fullUrl: PostFile,
-                fileSize: fileSize
-            })
+                emailsSent: sent,
+                emailsFailed: failed
+            });
         }
-        catch (err) {
-            console.log(err)
-            return res.status(500).json({ message: 'Error creating post', error: err.message });
-        }
+
+        // ── 5. Fetch full post and emit via socket ────────────────────
+        const post = await getPostById(PostId);
+        emitPost(post);
+
+        // ── 6. Respond ────────────────────────────────────────────────
+        return res.status(201).json({
+            message: 'Post created successfully',
+            postId: PostId,
+            post,
+            thumbnailUrl:  PostFileThumbnail  || null,
+            fullUrl:       PostFile           || null,
+            fileSize:      req.file ? fileSizeFormat(req.file.size) : null,
+            resourceType:  PostFileResourceType || null,
+            audienceList,
+        });
+
+    } catch (err) {
+        console.error('Post creation error:', err);
+        return res.status(500).json({ message: 'Error creating post', error: err.message });
     }
-    else {
-        try {
-
-            if (description && audience) {
-                console.log(audience)
-                await connectionPromise.query("SET time_zone = '+00:00'");
-                // escapedFilePath will convert a single backslash file path to a double backslash to solve database problem
-                // const escapedFilePath = filePath.replace(/\\/g, '\\\\');
-                const [insert] = await connectionPromise.query(`insert into posts(CreatorId,Description,PostedBy) values (?,?,?)`, [postedById, description, role]);
-                const PostId = insert.insertId;
-                console.log({ "this.....": PostId })
-                await connectionPromise.query(`insert into postaudience(PostId,AudienceType) values (?,?)`, [PostId, audience]);
-                // refetching the post to emit it to the socket
-                const post = await getPostById(PostId);
-
-                // ── socket or email based on audience ──
-                if (audience === 'alumni') {
-                    const { sent, failed } = await sendToAlumni(
-                        'New announcement from AUCA',
-                        description
-                    );
-                    return res.status(201).json({
-                        message: 'Post created and emails sent to alumni',
-                        postId: PostId,
-                        post,
-                        emailsSent: sent,
-                        emailsFailed: failed
-                    });
-                }
-                if (post) {
-                    if (audience == 'all') {
-                        io.to('all').emit('newPost', post);
-                    }
-                    if (audience == 'staff') {
-                        io.to('staff').emit('newPost', post);
-                    }
-                    if (audience == 'students') {
-                        io.to('students').emit('newPost', post);
-                    }
-                }
-
-                // Send response AFTER everything completes
-                res.status(200).json({
-                    message: `Post created successfully...`,
-                    postId: PostId,
-                    post: post,
-                    postedById
-                })
-
-            }
-            else {
-                return res.status(400).json({ message: 'Please provide all required fields.' });
-            }
-
-
-
-        }
-
-        catch (err) {
-            console.log(err);
-            return res.status(500).json({ message: 'Error creating post', error: err.message });
-        }
-
-    }
-
-})
+});
 
 
 router.get('/', Authenticate, async (req, res) => {
     const id = req.user.Id;
     const userRole = req.user.role == 'staff' ? 'staff' : 'students';
     const userLastOnlineTimestamp = req.query.since;
+    const userFaculty = req.user.Faculty;
+    const userDepartment = req.user.Department;
 
     console.log('Raw since parameter:', userLastOnlineTimestamp);
 
@@ -275,7 +240,7 @@ router.get('/', Authenticate, async (req, res) => {
             const mysqlDateFormat = userLastOnlineDate.toISOString().slice(0, 19).replace('T', ' ');
             console.log('MySQL format:', mysqlDateFormat);
 
-            const query = `
+            const staffQuery = `
                 SELECT 
     p.Id,
     CASE 
@@ -314,7 +279,56 @@ LEFT JOIN students s ON p.CreatorId = s.StudentId
 LEFT JOIN staff st ON p.CreatorId = st.Id
 LEFT JOIN postfiles f ON p.Id = f.PostId
 INNER JOIN postaudience pa ON pa.PostId = p.Id
-WHERE (pa.AudienceType = ? OR pa.AudienceType = 'all')
+WHERE (pa.AudienceType ='staff' OR pa.AudienceType = 'all')
+    AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
+GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
+         st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
+         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
+ORDER BY p.Timestamp DESC
+            `;
+
+
+            const studentsQuery=`
+                SELECT 
+    p.Id,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
+        ELSE st.Id 
+    END AS CreatorId,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.Fname 
+        ELSE st.Fname 
+    END AS Fname,   
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.Lname 
+        ELSE st.Lname 
+    END AS Lname,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
+        ELSE st.ProfileUrl 
+    END AS ProfileUrl,
+    CASE 
+        WHEN s.StudentId IS NOT NULL THEN 'Student' 
+        ELSE st.Role 
+    END AS Role,
+    p.Description,
+    p.Timestamp,
+    f.FileType,
+    f.ThumbnailUrl,
+    f.FullUrl,
+    f.FileSize,
+    pa.AudienceType,
+    st.Department,
+    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
+    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
+    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS PostComments
+FROM posts p
+LEFT JOIN students s ON p.CreatorId = s.StudentId
+LEFT JOIN staff st ON p.CreatorId = st.Id
+LEFT JOIN postfiles f ON p.Id = f.PostId
+INNER JOIN postaudience pa ON pa.PostId = p.Id
+WHERE (pa.AudienceType IN  (?,?,'students','all'))
     AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
@@ -324,8 +338,14 @@ ORDER BY p.Timestamp DESC
             `;
 
             console.log('Executing query with params:', [userRole, userLastOnlineDate]);
+            var posts;
 
-            const [posts] = await connectionPromise.query(query, [userRole, userLastOnlineDate]);
+            if (userRole === 'staff') {
+                 [posts] = await connectionPromise.query(staffQuery, [ userLastOnlineDate]);
+            }
+            if (userRole === 'students') {
+                    [posts] = await connectionPromise.query(studentsQuery, [userFaculty,userDepartment, userLastOnlineDate]);
+            }
 
             console.log('Query result count:', posts.length);
 
@@ -354,8 +374,8 @@ ORDER BY p.Timestamp DESC
         // Original code for when no 'since' parameter is provided
         try {
             await connectionPromise.query("SET time_zone = '+00:00'");
-
-            const [posts] = await connectionPromise.query(`
+            var posts;
+            var studentsQuery=`
                 SELECT 
                     p.Id,
                     CASE 
@@ -384,7 +404,7 @@ ORDER BY p.Timestamp DESC
                     f.ThumbnailUrl,
                     f.FullUrl,
                     f.FileSize,
-                    p.Audience as AudienceType,
+                    pa.AudienceType as AudienceType,
                     st.Department,
                     (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
                     (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
@@ -393,13 +413,67 @@ ORDER BY p.Timestamp DESC
                 LEFT JOIN students s ON p.CreatorId = s.StudentId
                 LEFT JOIN staff st ON p.CreatorId = st.Id
                 LEFT JOIN postfiles f ON p.Id = f.PostId
-                WHERE p.Audience = ? OR p.Audience = 'all'
+                LEFT JOIN postaudience pa ON p.Id = pa.PostId
+                WHERE pa.AudienceType IN (?,?,'students','all')
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
                          p.CreatorId, p.Description, p.Timestamp, f.FileType,
-                         f.ThumbnailUrl, f.FullUrl, f.FileSize, p.Audience,st.Department
+                         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
-            `, [userRole]);
+            `;
+            var staffQuery=`
+                SELECT 
+                    p.Id,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.StudentId 
+                        ELSE st.Id 
+                    END AS CreatorId,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.Fname 
+                        ELSE st.Fname 
+                    END AS Fname,   
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.Lname 
+                        ELSE st.Lname 
+                    END AS Lname,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN s.ProfileUrl 
+                        ELSE st.ProfileUrl 
+                    END AS ProfileUrl,
+                    CASE 
+                        WHEN s.StudentId IS NOT NULL THEN 'Student' 
+                        ELSE st.Role 
+                    END AS Role,
+                    p.Description,
+                    p.Timestamp,
+                    f.FileType,
+                    f.ThumbnailUrl,
+                    f.FullUrl,
+                    f.FileSize,
+                    pa.AudienceType as AudienceType,
+                    st.Department,
+                    (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
+                    (SELECT JSON_ARRAYAGG(l.ReactionType) FROM postreactions l WHERE l.PostId = p.Id) AS ReactionTypes,
+                    (SELECT COUNT(*) FROM comments c WHERE c.PostId = p.Id) AS PostComments
+                FROM posts p
+                LEFT JOIN students s ON p.CreatorId = s.StudentId
+                LEFT JOIN staff st ON p.CreatorId = st.Id
+                LEFT JOIN postfiles f ON p.Id = f.PostId
+                LEFT JOIN postaudience pa ON p.Id = pa.PostId
+                WHERE pa.AudienceType = 'staff' OR pa.AudienceType = 'all'
+                GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
+                         st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
+                         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+                         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType,st.Department
+                ORDER BY p.Timestamp DESC
+            `;
+
+             if (userRole === 'staff') {
+                    [posts] = await connectionPromise.query(staffQuery);
+             }
+                if (userRole === 'students') {
+                    [posts] = await connectionPromise.query(studentsQuery, [userFaculty,userDepartment]);
+                }
 
             // Format timestamps to ISO strings for consistency
             const formattedPosts = posts.map(post => ({
