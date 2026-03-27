@@ -167,11 +167,12 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             const fileType     = path.extname(PostFile);
             const fileMimeType = req.file.mimetype;
             const fileSize     = fileSizeFormat(req.file.size);
+            console.log('Storing file for post:', { PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize });
 
             await connectionPromise.query(
-                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize, FileType)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize, PostFileResourceType]
+                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]
             );
         }
 
