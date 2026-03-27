@@ -11,33 +11,10 @@ const { get } = require('../../../socketDirectory')
 const getPostById = require('../../../utils/getPosts');
 require('dotenv').config();
 const upload = require("../../../fileHandler/upload");
-const uploadImage = require("../../../fileHandler/uploadImage");
+const uploadImage = require("../../../fileHandler/uploadFile");
 
 
-// // storing images on server desktop
-// const desktopFolderPath = path.join(os.homedir(), 'Desktop');
-// const uploadFolderPath = path.join(desktopFolderPath, 'project-storage-files');
-// const postsFolderLocation = path.join(uploadFolderPath, 'posts')
-// const thumbNailFolderLocation = path.join(uploadFolderPath, 'thumbnails');
 
-// // defining image posts storage
-
-// const storage = multer.diskStorage({
-
-//     destination: function (req, file, cb) {
-//         if (file.fieldname == 'orgPostFile') {
-//             cb(null, postsFolderLocation)
-//         }
-//         if (file.fieldname == 'postFileThumbnail') {
-//             cb(null, thumbNailFolderLocation)
-//         }
-//     },
-//     filename: function (req, file, cb) {
-//         const fileName = Date.now() + path.extname(file.originalname)
-//         cb(null, fileName)
-
-//     }
-// })
 
 // WE will use cloudinary to store images instead of local storage
 
@@ -50,9 +27,11 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     let PostFileThumbnail;
 
     if (req.file) {
-        const { originalUrl, blurredUrl } = await uploadImage(req.file.buffer, true);
+        const { originalUrl, thumbnailUrl, blurredUrl,resourceType } = await uploadImage(req.file.buffer, true, req.file.mimetype, req.file.originalname);
+        console.log('Upload result........:', { originalUrl, thumbnailUrl, blurredUrl, resourceType });
+
         PostFile = originalUrl ? originalUrl : null;
-        PostFileThumbnail = blurredUrl ? blurredUrl : null;
+        PostFileThumbnail = blurredUrl ? blurredUrl : thumbnailUrl ? thumbnailUrl : null;
     }
 
 

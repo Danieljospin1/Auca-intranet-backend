@@ -7,7 +7,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path');
 require('dotenv').config();
-const uploadImage=require('../fileHandler/uploadImage');
+const uploadFile=require('../fileHandler/uploadFile');
 const upload=require('../fileHandler/upload')
 
 
@@ -77,7 +77,7 @@ router.patch('/', Authenticate, async (req, res) => {
 
 router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     const StudentId = req.user.Id;
-    const { originalUrl } = await uploadImage(req.file.buffer,false);
+    const { originalUrl } = await uploadFile(req.file.buffer, false, req.file.mimetype, req.file.originalname);
 
     if(!originalUrl){
         return res.status(400).json({ message: "No profile image uploaded" });

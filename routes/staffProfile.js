@@ -5,7 +5,7 @@ const connectionPromise=require('../database & models/databaseConnection');
 const path = require('path')
 const os=require('os')
 const multer=require('multer')
-const uploadImage=require('../fileHandler/uploadImage');
+const uploadFile=require('../fileHandler/uploadFile');
 const upload=require('../fileHandler/upload')
 
 router.get('/', Authenticate, async (req, res) => {
@@ -39,7 +39,7 @@ router.get('/', Authenticate, async (req, res) => {
 
 router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     const userId = req.user.Id;
-    const { originalUrl } = await uploadImage(req.file.buffer, true);
+    const { originalUrl } = await uploadFile(req.file.buffer, false, req.file.mimetype, req.file.originalname);
 
     if (!originalUrl) {
         return res.status(400).json({ message: "No profile image uploaded" });
