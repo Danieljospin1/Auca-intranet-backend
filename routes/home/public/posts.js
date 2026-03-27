@@ -215,6 +215,7 @@ router.get('/', Authenticate, async (req, res) => {
     const userLastOnlineTimestamp = req.query.since;
     const userFaculty = req.user.Faculty;
     const userDepartment = req.user.Department;
+    const userStudyLevel = req.user.StudyLevel;
 
     console.log('Raw since parameter:', userLastOnlineTimestamp);
 
@@ -328,7 +329,7 @@ LEFT JOIN students s ON p.CreatorId = s.StudentId
 LEFT JOIN staff st ON p.CreatorId = st.Id
 LEFT JOIN postfiles f ON p.Id = f.PostId
 INNER JOIN postaudience pa ON pa.PostId = p.Id
-WHERE (pa.AudienceType IN  (?,?,'students','all'))
+WHERE (pa.AudienceType IN  (?,?,?,'students','all'))
     AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
@@ -344,7 +345,7 @@ ORDER BY p.Timestamp DESC
                  [posts] = await connectionPromise.query(staffQuery, [ userLastOnlineDate]);
             }
             if (userRole === 'students') {
-                    [posts] = await connectionPromise.query(studentsQuery, [userFaculty,userDepartment, userLastOnlineDate]);
+                    [posts] = await connectionPromise.query(studentsQuery, [userStudyLevel,userFaculty,userDepartment, userLastOnlineDate]);
             }
 
             console.log('Query result count:', posts.length);
@@ -414,7 +415,7 @@ ORDER BY p.Timestamp DESC
                 LEFT JOIN staff st ON p.CreatorId = st.Id
                 LEFT JOIN postfiles f ON p.Id = f.PostId
                 LEFT JOIN postaudience pa ON p.Id = pa.PostId
-                WHERE pa.AudienceType IN (?,?,'students','all')
+                WHERE pa.AudienceType IN (?,?,?,'students','all')
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
                          p.CreatorId, p.Description, p.Timestamp, f.FileType,
@@ -472,7 +473,7 @@ ORDER BY p.Timestamp DESC
                     [posts] = await connectionPromise.query(staffQuery);
              }
                 if (userRole === 'students') {
-                    [posts] = await connectionPromise.query(studentsQuery, [userFaculty,userDepartment]);
+                    [posts] = await connectionPromise.query(studentsQuery, [userStudyLevel,userFaculty,userDepartment]);
                 }
 
             // Format timestamps to ISO strings for consistency

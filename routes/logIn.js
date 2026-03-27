@@ -26,10 +26,10 @@ router.post('/', async (req, res) => {
                     return res.status(401).json("invalid user credentials")
                 }
                 else {
-                    const [studentProfile]= await connectionPromise.query(`select StudentId,Fname,Lname,Email,Phone,Faculty,Department,ProfileUrl from students where StudentId=?`,[Id]);
+                    const [studentProfile]= await connectionPromise.query(`select StudentId,Fname,Lname,Email,Phone,Faculty,Department,ProfileUrl,StudyLevel from students where StudentId=?`,[Id]);
                     const studentFaculty = await connectionPromise.query(`SELECT Faculty FROM students WHERE StudentId=?`,[Id])
-                    const accessToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty,"Department": studentFaculty[0][0].Department, "role": "student" }, process.env.ACCESS_TOKEN_SECRET, {})
-                    const refreshToken = token.sign({ "Id": Id, "Faculty": studentFaculty[0][0].Faculty,"Department":studentFaculty[0][0].Department, "role": "student" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
+                    const accessToken = token.sign({ "Id": Id,"StudyLevel": studentProfile[0].StudyLevel, "Faculty": studentFaculty[0][0].Faculty,"Department": studentProfile[0].Department, "role": "student" }, process.env.ACCESS_TOKEN_SECRET, {})
+                    const refreshToken = token.sign({ "Id": Id,"StudyLevel": studentProfile[0].StudyLevel, "Faculty": studentFaculty[0][0].Faculty,"Department":studentProfile[0].Department, "role": "student" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
                     return res.status(200).send({ accessToken, refreshToken,studentProfile });
                 }
             }
