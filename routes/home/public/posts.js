@@ -270,6 +270,7 @@ router.get('/', Authenticate, async (req, res) => {
     p.Description,
     p.Timestamp,
     f.FileType,
+    f.MimeType,
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
@@ -289,7 +290,7 @@ WHERE (pa.AudienceType ='staff' OR pa.AudienceType = 'all')
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
          p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
-         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
+         f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType, st.Department
 ORDER BY p.Timestamp DESC
             `;
 
@@ -320,6 +321,7 @@ ORDER BY p.Timestamp DESC
     p.Description,
     p.Timestamp,
     f.FileType,
+    f.MimeType,
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
@@ -339,7 +341,7 @@ WHERE (pa.AudienceType IN  (?,?,?,'students','all'))
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
          p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
-         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
+         f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType, st.Department
 ORDER BY p.Timestamp DESC
             `;
 
@@ -407,6 +409,7 @@ ORDER BY p.Timestamp DESC
                     p.Description,
                     p.Timestamp,
                     f.FileType,
+                    f.MimeType,
                     f.ThumbnailUrl,
                     f.FullUrl,
                     f.FileSize,
@@ -425,7 +428,7 @@ ORDER BY p.Timestamp DESC
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
                          p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
-                         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType,st.Department
+                         f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
             var staffQuery=`
@@ -454,6 +457,7 @@ ORDER BY p.Timestamp DESC
                     p.Description,
                     p.Timestamp,
                     f.FileType,
+                    f.MimeType,
                     f.ThumbnailUrl,
                     f.FullUrl,
                     f.FileSize,
@@ -472,7 +476,7 @@ ORDER BY p.Timestamp DESC
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
                          p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
-                         f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType,st.Department
+                         f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
 
