@@ -30,6 +30,7 @@ async function getPostById(postId) {
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
+    f.FileName,
     pa.AudienceType,
     st.Department,
     (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,

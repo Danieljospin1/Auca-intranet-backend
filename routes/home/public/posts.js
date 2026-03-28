@@ -167,12 +167,13 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             const fileType     = path.extname(PostFile);
             const fileMimeType = req.file.mimetype;
             const fileSize     = fileSizeFormat(req.file.size);
-            console.log('Storing file for post:', { PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize });
+            const fileName       = req.file.originalname;
+            console.log('Storing file for post:', { PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize, fileName });
 
             await connectionPromise.query(
-                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize]
+                `INSERT INTO postfiles (PostId, FileType, ThumbnailUrl, FullUrl, MimeType, FileSize,FileName)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize, fileName]
             );
         }
 
@@ -271,6 +272,7 @@ router.get('/', Authenticate, async (req, res) => {
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
+    f.FileName,
     pa.AudienceType,
     st.Department,
     (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
@@ -320,6 +322,7 @@ ORDER BY p.Timestamp DESC
     f.ThumbnailUrl,
     f.FullUrl,
     f.FileSize,
+    f.FileName,
     pa.AudienceType,
     st.Department,
     (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
@@ -406,6 +409,7 @@ ORDER BY p.Timestamp DESC
                     f.ThumbnailUrl,
                     f.FullUrl,
                     f.FileSize,
+                    f.FileName,
                     pa.AudienceType as AudienceType,
                     st.Department,
                     (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
@@ -452,6 +456,7 @@ ORDER BY p.Timestamp DESC
                     f.ThumbnailUrl,
                     f.FullUrl,
                     f.FileSize,
+                    f.FileName,
                     pa.AudienceType as AudienceType,
                     st.Department,
                     (SELECT COUNT(*) FROM postreactions l WHERE l.PostId = p.Id) AS PostReactions,
