@@ -44,7 +44,7 @@ INNER JOIN postaudience pa ON pa.PostId = p.Id
 WHERE p.Id = ?
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
          f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
 ORDER BY p.Timestamp DESC
     `, [postId]);

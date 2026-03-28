@@ -287,7 +287,7 @@ WHERE (pa.AudienceType ='staff' OR pa.AudienceType = 'all')
     AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
          f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
 ORDER BY p.Timestamp DESC
             `;
@@ -337,7 +337,7 @@ WHERE (pa.AudienceType IN  (?,?,?,'students','all'))
     AND CONVERT_TZ(p.Timestamp, @@session.time_zone, '+00:00') > ?
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
          f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType, st.Department
 ORDER BY p.Timestamp DESC
             `;
@@ -423,7 +423,7 @@ ORDER BY p.Timestamp DESC
                 WHERE pa.AudienceType IN (?,?,?,'students','all')
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-                         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+                         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
@@ -470,7 +470,7 @@ ORDER BY p.Timestamp DESC
                 WHERE pa.AudienceType = 'staff' OR pa.AudienceType = 'all'
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-                         p.CreatorId, p.Description, p.Timestamp, f.FileType,
+                         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
