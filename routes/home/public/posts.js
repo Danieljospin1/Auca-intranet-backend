@@ -164,7 +164,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
         // ── 3. Store file if attached ─────────────────────────────────
         if (PostFile) {
-            const fileType     = path.extname(PostFile);
+            const fileType     = path.extname(req.file.originalname).toLowerCase();
+            console.log('Processing file for post:', { PostId, fileType, PostFileThumbnail, PostFile });
             const fileMimeType = req.file.mimetype;
             const fileSize     = fileSizeFormat(req.file.size);
             const fileName       = req.file.originalname;
