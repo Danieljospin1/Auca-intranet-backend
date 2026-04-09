@@ -101,6 +101,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         const [alumniList] = await db.query(
             `SELECT Names, Email FROM alumni WHERE OptedOut = 0`
         );
+        console.log("client emails",alumniList);
 
         if (alumniList.length === 0) return { sent: 0, failed: 0 };
 

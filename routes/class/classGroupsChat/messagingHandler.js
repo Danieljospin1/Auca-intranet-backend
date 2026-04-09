@@ -207,38 +207,40 @@ module.exports = async (io) => {
                 console.warn('[socket] joining announcement rooms failed', err);
             }
 
-            // --- message sending handler ---
             socket.on('roomMessage', async ({ room, message, messageTemporaryId }, acknowledgment) => {
                 try {
-                    console.log(message)
                     await safeQuery(
                         'INSERT INTO messages (SenderId, SenderType, Text, ClassId) VALUES (?, ?, ?, ?)',
                         [userId, userRole, message, room]
                     );
 
                     const [incomingMessageRows] = await safeQuery(`
-            SELECT m.Id, m.SenderId,
-              CASE WHEN m.SenderType='staff' THEN st.Lname ELSE s.Lname END as Lname,
-              CASE WHEN m.SenderType='staff' THEN st.ProfileUrl ELSE s.ProfileUrl END as ProfileImage,
-              m.SenderType, m.Text, m.ClassId, m.Timestamp
-            FROM messages m
-            LEFT JOIN staff st on m.SenderId = st.Id
-            LEFT JOIN students s on m.SenderId = s.StudentId
-            WHERE m.SenderId = ? AND m.ClassId = ?
-            ORDER BY m.Timestamp DESC
-            LIMIT 1
-          `, [userId, room]);
+      SELECT m.Id, m.SenderId,
+        CASE WHEN m.SenderType='staff' THEN st.Lname ELSE s.Lname END as Lname,
+        CASE WHEN m.SenderType='staff' THEN st.ProfileUrl ELSE s.ProfileUrl END as ProfileImage,
+        m.SenderType, m.Text, m.ClassId, m.Timestamp
+      FROM messages m
+      LEFT JOIN staff st on m.SenderId = st.Id
+      LEFT JOIN students s on m.SenderId = s.StudentId
+      WHERE m.SenderId = ? AND m.ClassId = ?
+      ORDER BY m.Timestamp DESC
+      LIMIT 1
+    `, [userId, room]);
 
                     if (Array.isArray(incomingMessageRows) && incomingMessageRows.length > 0) {
-                        console.log("this is working", incomingMessageRows, messageTemporaryId)
+                        console.log("Message saved:", incomingMessageRows, messageTemporaryId);
+
+                        // Emit to everyone else in the room
                         socket.to(room).emit('messages', incomingMessageRows);
-                        acknowledgment(incomingMessageRows, messageTemporaryId);
 
-
+                        // Only call acknowledgment if client sent a callback
+                        if (typeof acknowledgment === 'function') {
+                            acknowledgment(incomingMessageRows, messageTemporaryId);
+                        }
                     }
                 } catch (error) {
                     console.log('database error while handling roomMessage:', error);
-                    try { socket.emit('message_error', { message: 'Failed to send message' }); } catch (e) {/* ignore */ }
+                    try { socket.emit('message_error', { message: 'Failed to send message' }); } catch (e) { /* ignore */ }
                 }
             });
             socket.on('pinnedMessage', async ({ ClassId, MessageId }) => {
@@ -252,8 +254,8 @@ module.exports = async (io) => {
                     }
                     await safeQuery('update messages set IsPinned=? where Id=? and ClassId=?', [1, MessageId, ClassId]);
                     console.log(typeof (ClassId))
-                    socket.to(String(ClassId)).emit("messagePin",  { ClassId, MessageId });
-                    console.log("emitted message pinning successfully!!!",{ ClassId, MessageId })
+                    socket.to(String(ClassId)).emit("messagePin", { ClassId, MessageId });
+                    console.log("emitted message pinning successfully!!!", { ClassId, MessageId })
                 }
                 catch (err) {
                     console.log(err)
