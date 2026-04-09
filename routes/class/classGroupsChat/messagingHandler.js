@@ -157,7 +157,7 @@ module.exports = async (io) => {
           SELECT m.Id, m.SenderId,
             CASE WHEN m.SenderType='staff' THEN st.Lname ELSE s.Lname END as Lname,
             CASE WHEN m.SenderType='staff' THEN st.ProfileUrl ELSE s.ProfileUrl END as ProfileImage,
-            m.SenderType, m.Text, m.ClassId, m.Timestamp
+            m.SenderType, m.Text, m.ClassId, m.Timestamp, m.ReplyToMessageId, m.IsPinned
           FROM messages m
           LEFT JOIN staff st on m.SenderId = st.Id
           LEFT JOIN students s on m.SenderId = s.StudentId
@@ -207,18 +207,19 @@ module.exports = async (io) => {
                 console.warn('[socket] joining announcement rooms failed', err);
             }
 
-            socket.on('roomMessage', async ({ room, message, messageTemporaryId }, acknowledgment) => {
+            socket.on('roomMessage', async ({ room, message,replyToMessageId, messageTemporaryId }, acknowledgment) => {
+                const replyToMessageIdV = replyToMessageId || null;
                 try {
                     await safeQuery(
-                        'INSERT INTO messages (SenderId, SenderType, Text, ClassId) VALUES (?, ?, ?, ?)',
-                        [userId, userRole, message, room]
+                        'INSERT INTO messages (SenderId, SenderType, Text, ClassId, ReplyToMessageId, IsPinned) VALUES (?, ?, ?, ?, ?, ?)',
+                        [userId, userRole, message, room, replyToMessageIdV, 0]
                     );
 
                     const [incomingMessageRows] = await safeQuery(`
       SELECT m.Id, m.SenderId,
         CASE WHEN m.SenderType='staff' THEN st.Lname ELSE s.Lname END as Lname,
         CASE WHEN m.SenderType='staff' THEN st.ProfileUrl ELSE s.ProfileUrl END as ProfileImage,
-        m.SenderType, m.Text, m.ClassId, m.Timestamp
+        m.SenderType, m.Text, m.ClassId, m.Timestamp, m.ReplyToMessageId, m.IsPinned
       FROM messages m
       LEFT JOIN staff st on m.SenderId = st.Id
       LEFT JOIN students s on m.SenderId = s.StudentId
