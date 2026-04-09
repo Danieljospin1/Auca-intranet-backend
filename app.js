@@ -28,6 +28,19 @@ const postImgThumbnail = require('./routes/FileHandlers/postThumbnail')
 const classResourceFiles = require('./routes/FileHandlers/classResources')
 const courseRegistration = require('./routes/courseRegistration')
 const register = require('./routes/Register')  
+const rateLimit=require('express-rate-limit')
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, 
+  message: {
+    error: "Too many requests, try again later."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+app.set('trust proxy', 1);
 
 require('dotenv').config()
 

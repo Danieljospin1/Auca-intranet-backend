@@ -99,7 +99,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     async function sendToAlumni(subject, message) {
         const db = await connectionPromise;
         const [alumniList] = await db.query(
-            `SELECT Names, Email FROM alumni WHERE OptedOut = FALSE`
+            `SELECT Names, Email FROM alumni WHERE OptedOut = 0`
         );
 
         if (alumniList.length === 0) return { sent: 0, failed: 0 };
