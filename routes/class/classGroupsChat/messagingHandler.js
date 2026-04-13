@@ -205,6 +205,7 @@ module.exports = async (io) => {
                     socket.join(socket.user.Faculty);
                     socket.join(socket.user.Department);
                     console.log('user is student, joining student room');
+                    console.log(`user joined rooms: students, ${socket.user.StudyLevel}, ${socket.user.Faculty}, ${socket.user.Department}`);
                 }
             } catch (err) {
                 console.warn('[socket] joining announcement rooms failed', err);
