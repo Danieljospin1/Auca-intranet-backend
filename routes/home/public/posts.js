@@ -86,12 +86,17 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────
 
-    // ── helper: emit socket to correct room ──────────────────────────
+    // ── helper: emit socket to correct personalized room ──────────────────────────
     function emitPost(post) {
         if (!post) return console.log("Post not found for socket emission");
         if (audience === 'all')      io.to('all').emit('newPost', post);
         if (audience === 'staff')    io.to('staff').emit('newPost', post);
-        if (audience === 'students') io.to('students').emit('newPost', post);
+        if(audienceList.length > 0 && audience === 'students'){
+            audienceList.forEach(target=>{
+                io.to(target).emit('newPost', post);
+                    console.log(`Emitted newPost to ${target} room for post ${post.Id}`);
+            })
+        }
     }
     // ─────────────────────────────────────────────────────────────────
 
@@ -153,8 +158,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
         // ── 1. Create the post ────────────────────────────────────────
         const [insert] = await connectionPromise.query(
-            `INSERT INTO posts (CreatorId, Description, PostedBy) VALUES (?, ?, ?)`,
-            [postedById, description, role]
+            `INSERT INTO posts (CreatorId, Description, PostedBy,Audience) VALUES (?, ?, ?, ?)`,
+            [postedById, description, role, audience]
         );
         if (!insert) return res.status(500).json({ message: 'Error creating post.' });
 

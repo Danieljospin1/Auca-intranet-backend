@@ -193,7 +193,7 @@ module.exports = async (io) => {
                 console.warn('[socket] userstatus insert/update error', err);
             }
 
-            // join announcement rooms
+            // join announcement personalized rooms 
             try {
                 socket.join('all');
                 if (userRole === 'staff') {
@@ -201,6 +201,9 @@ module.exports = async (io) => {
                     console.log('user is staff, joining staff room');
                 } else {
                     socket.join('students');
+                    socket.join(socket.user.StudyLevel);
+                    socket.join(socket.user.Faculty);
+                    socket.join(socket.user.Department);
                     console.log('user is student, joining student room');
                 }
             } catch (err) {
