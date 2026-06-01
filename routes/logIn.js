@@ -20,7 +20,9 @@ router.post('/', async (req, res) => {
 
 
     try {
-        if (UserType.toLoweCase()==="student" ) {
+        if (UserType.toLowerCase()==="student" ) {
+            console.log(UserType);
+            console.log(UserType.toLowerCase())
             if (typeof (Id) == 'string') {
                 return res.status(401).json({"message":'input valid id'})
             }
@@ -50,9 +52,10 @@ router.post('/', async (req, res) => {
                     return res.status(401).json("invalid user credentials")
                 }
                 else {
-                    const [aucasaUserRole]=await connectionPromise.query(`select role from aucasa where Id=? AND IsInService=1`,[Id]);
-                    if(!aucasaUserRole){
-                        return res.status(401).json("invalid user credentials");
+                    const [aucasaUserRole]=await connectionPromise.query(`select role from aucasa where StudentId=? AND IsInService=1`,[Id]);
+                    
+                    if(!aucasaUserRole[0]){
+                        return res.status(401).json("invalid user credentials.");
                     }
                     const [studentProfile]= await connectionPromise.query(`select StudentId,Fname,Lname,Email,Phone,Faculty,Department,ProfileUrl,StudyLevel from students where StudentId=?`,[Id]);
                     const studentFaculty = await connectionPromise.query(`SELECT Faculty FROM students WHERE StudentId=?`,[Id])
@@ -77,6 +80,9 @@ router.post('/', async (req, res) => {
                 const refreshToken = token.sign({ "Id": staffId[0].Id, "Department": staffDepartment[0].Department, "role": "staff" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '15d' })
                 return res.status(200).send({ accessToken, refreshToken,staffProfile });
             }
+        }
+        else{
+            return res.status(400).json("message: Invalid user type.")
         }
     }
 
