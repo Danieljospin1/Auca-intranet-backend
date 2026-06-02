@@ -27,6 +27,9 @@ const notification = require('./routes/notifications/notifications')
 const postImgThumbnail = require('./routes/FileHandlers/postThumbnail')
 const classResourceFiles = require('./routes/FileHandlers/classResources')
 const courseRegistration = require('./routes/courseRegistration')
+const studentClaimsHandler = require('./routes/home/public/claims/studentClaimsHandler')
+const aucasaClaimsManagementHandler = require('./routes/home/public/claims/aucasaClaimsManagementHandler')
+
 const register = require('./routes/Register')  
 const rateLimit=require('express-rate-limit')
 
@@ -107,7 +110,8 @@ app.use('/home/posts', postsFileHandler)
 app.use('/home/posts', postImgThumbnail)
 app.use('/notifications', notification)
 app.use('/courses', courseRegistration)
-
+app.use('/home/posts/claims', studentClaimsHandler)
+app.use('/home/posts/claims/management', aucasaClaimsManagementHandler)
 // ERROR HANDLING MIDDLEWARE
 app.use((err, req, res, next) => {
   console.error('Error:', err)
