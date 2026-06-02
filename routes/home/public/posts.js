@@ -29,7 +29,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
     if (req.file) {
         const { originalUrl, thumbnailUrl, blurredUrl, resourceType } = await uploadImage(
-            req.file.buffer, true, req.file.mimetype, req.file.originalname
+            req.file.buffer, "posts", req.file.mimetype, req.file.originalname
         );
         console.log('Upload result........:', { originalUrl, thumbnailUrl, blurredUrl, resourceType });
 

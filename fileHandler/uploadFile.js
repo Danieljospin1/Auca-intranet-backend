@@ -29,7 +29,7 @@ const stripExtension = (filename) => {
   return filename.replace(/\.[^/.]+$/, '');
 };
 
-const uploadFile = async (fileBuffer, isPost, mimetype, originalName) => {
+const uploadFile = async (fileBuffer, cloudinaryFolderName, mimetype, originalName) => {
   const category     = getFileCategory(mimetype);
   const resourceType = getResourceType(category);
 
@@ -43,7 +43,7 @@ const uploadFile = async (fileBuffer, isPost, mimetype, originalName) => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       {
-        folder:        isPost ? 'posts' : 'profiles',
+        folder:        cloudinaryFolderName || 'general_uploads',
         resource_type: resourceType,
         quality:       'auto',
         fetch_format:  category === 'image' ? 'auto' : undefined,
@@ -56,7 +56,7 @@ const uploadFile = async (fileBuffer, isPost, mimetype, originalName) => {
         const uploadedUrl = result.secure_url;
 
         // Blurred placeholder — images only
-        const blurredUrl = (category === 'image' && isPost)
+        const blurredUrl = (category === 'image' && cloudinaryFolderName === 'posts')
           ? cloudinary.url(result.public_id, {
               transformation: [
                 { width: 600, crop: 'scale' },

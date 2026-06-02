@@ -77,7 +77,7 @@ router.patch('/', Authenticate, async (req, res) => {
 
 router.post('/', upload.single('profile'), Authenticate, async (req, res) => {
     const StudentId = req.user.Id;
-    const { originalUrl } = await uploadFile(req.file.buffer, false, req.file.mimetype, req.file.originalname);
+    const { originalUrl } = await uploadFile(req.file.buffer, "profiles", req.file.mimetype, req.file.originalname);
 
     if(!originalUrl){
         return res.status(400).json({ message: "No profile image uploaded" });
