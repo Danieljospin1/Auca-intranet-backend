@@ -3,7 +3,7 @@ const router=express.Router();
 const connectionPromise=require('../../../../database & models/databaseConnection');
 const {Authenticate}=require('../../../../Authentication/authentication');
 const multer=require('multer');
-const express = require('express');
+
 
 //creating a get route for aucasa minister of communication to get total number of posts which are active,total number of claims of those active posts and total number of unreviewed claims of those active posts,
 //this route will be used in the dashboard of the minister of communication to show him the overall status of the claims and posts in the system
@@ -20,12 +20,19 @@ router.get('/summary',Authenticate,async(req,res)=>{
 
 //creating put route for aucasa minister of communication to automatically update ClaimStatus of array of claim Ids to reviewed, this route will be used in the dashboard of the minister of communication to review multiple claims at once and also to update the status of those claims to reviewed after reviewing them
 router.put('/review',Authenticate,async(req,res)=>{
-    const {claimIds}=req.body;
-    if(!claimIds || !Array.isArray(claimIds) || claimIds.length === 0){
-        return res.status(400).json({message:'claimIds is required and should be a non-empty array'});
+    const {ClaimIds}=req.body;
+    //validate strictly user
+    const aucasaUserRole=req.user.aucasaUserRole;
+    if(aucasaUserRole !== 'information and communication'){
+        return res.status(403).json({message:'Access denied. Only minister of communication can review claims.'});
     }
+    if(!ClaimIds || !Array.isArray(ClaimIds) || ClaimIds.length === 0){
+        return res.status(400).json({message:'ClaimIds is required and should be a non-empty array'});
+    }
+    
+    
     try{
-        await connectionPromise.query(`update claims set ClaimStatus='reviewed' where ClaimId IN (${claimIds.map(() => '?').join(',')})`, claimIds);
+        await connectionPromise.query(`update claims set ClaimStatus='reviewed' where ClaimId IN (${ClaimIds.map(() => '?').join(',')})`, ClaimIds);
         return res.status(200).json({message:'Claims reviewed successfully'});
     } catch (error) {
         return res.status(500).json({ message: 'Error reviewing claims' });
@@ -39,10 +46,10 @@ router.get('/categories/:claimCategory',Authenticate,async(req,res)=>{
         return res.status(400).json({message:'claimCategory is required'});
     }
     try{
-        const [claims]=await connectionPromise.query(`select c.ClaimId, c.PostId, c.StudentId,s.Lname,s.ProfileUrl, c.ClaimText, c.ClaimEvidenceUrl, c.ClaimVisibility, c.ClaimStatus,c.DateCreated, (select count(*) from claim_supports where ClaimId=c.ClaimId) as NumberOfSupports from claims c join students s on c.StudentId=s.StudentId where c.ClaimCategory=?`,[claimCategory]);
+        const [claims]=await connectionPromise.query(`select c.ClaimId, c.PostId, c.StudentId,s.Lname,s.ProfileUrl, c.ClaimText, c.ClaimEvidenceUrl, c.VisibilityStatus, c.ClaimStatus,c.DateCreated, (select count(*) from claimSupport where ClaimId=c.ClaimId) as NumberOfSupports from claims c join students s on c.StudentId=s.StudentId where c.Category=?`,[claimCategory]);
         return res.status(200).json({ claims });
     } catch (error) {
-        return res.status(500).json({ message: 'Error fetching claims' });
+        return res.status(500).json({ message: 'Error fetching claims',error: error.message });
     }
 });
 
