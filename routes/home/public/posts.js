@@ -102,7 +102,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     // ─────────────────────────────────────────────────────────────────
 
     // ── helper: send to alumni via Brevo ─────────────────────────────
-    async function sendToAlumni(subject,Title, message) {
+    async function sendToAlumni(subject,title, message) {
         const db = await connectionPromise;
         const [alumniList] = await db.query(
             `SELECT Names, Email FROM alumni WHERE OptedOut = 0`
@@ -127,7 +127,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                         subject,
                         htmlContent: `
                             <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
-                                <h2 style="color: #003366;">${Title}</h2>
+                                <h2 style="color: #003366;">${title}</h2>
                                 <p style="font-size: 15px; line-height: 1.6;">${message}</p>
                                 <hr style="margin-top: 30px;"/>
                                 <small style="color: #999;">
@@ -160,9 +160,11 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         // ── 1. Create the post ────────────────────────────────────────
         const [insert] = await connectionPromise.query(
             `INSERT INTO posts (CreatorId,Title, Description, PostedBy,Audience) VALUES (?, ?, ?, ?, ?)`,
-            [postedById, Title, description, role, audience]
+            [postedById, title, description, role, audience]
         );
-        if (!insert) return res.status(500).json({ message: 'Error creating post.' });
+        if (!insert) {
+            return res.status(500).json({ message: 'Error creating post.' })
+        };
 
         const PostId = insert.insertId;
 
@@ -278,6 +280,7 @@ router.get('/', Authenticate, async (req, res) => {
         WHEN s.StudentId IS NOT NULL THEN 'Student' 
         ELSE st.Role 
     END AS Role,
+    p.Title,
     p.Description,
     p.Timestamp,
     f.FileType,
@@ -329,6 +332,7 @@ ORDER BY p.Timestamp DESC
         WHEN s.StudentId IS NOT NULL THEN 'Student' 
         ELSE st.Role 
     END AS Role,
+    p.Title,
     p.Description,
     p.Timestamp,
     f.FileType,
@@ -417,6 +421,7 @@ ORDER BY p.Timestamp DESC
                         WHEN s.StudentId IS NOT NULL THEN 'Student' 
                         ELSE st.Role 
                     END AS Role,
+                    p.Title,
                     p.Description,
                     p.Timestamp,
                     f.FileType,
@@ -438,7 +443,7 @@ ORDER BY p.Timestamp DESC
                 WHERE pa.AudienceType IN (?,?,?,'students','all')
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-                         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
+                         p.CreatorId,p.Title, p.Description, p.Timestamp, f.FileType,f.FileName,
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
@@ -465,6 +470,7 @@ ORDER BY p.Timestamp DESC
                         WHEN s.StudentId IS NOT NULL THEN 'Student' 
                         ELSE st.Role 
                     END AS Role,
+                    p.Title,
                     p.Description,
                     p.Timestamp,
                     f.FileType,
@@ -486,7 +492,7 @@ ORDER BY p.Timestamp DESC
                 WHERE pa.AudienceType = 'staff' OR pa.AudienceType = 'all'
                 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
                          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-                         p.CreatorId, p.Description, p.Timestamp, f.FileType,f.FileName,
+                         p.CreatorId,p.Title, p.Description, p.Timestamp, f.FileType,f.FileName,
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
