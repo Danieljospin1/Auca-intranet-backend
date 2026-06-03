@@ -26,6 +26,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     let PostFile;
     let PostFileThumbnail;
     let PostFileResourceType;
+    const { description, audience,Title } = req.body;
 
     if (req.file) {
         const { originalUrl, thumbnailUrl, blurredUrl, resourceType } = await uploadImage(
@@ -38,7 +39,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         PostFileResourceType = resourceType || null;
     }
 
-    const { description, audience,Title } = req.body;
+    
 
     // Parse audienceList — app sends it as a JSON string via FormData
     let audienceList = [];
@@ -152,7 +153,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     try {
         await connectionPromise.query("SET time_zone = '+00:00'");
 
-        if (!description || !audience || !Title) {
+        if (!audience || !Title) {
             return res.status(400).json({ message: 'Please provide all required fields.' });
         }
 
