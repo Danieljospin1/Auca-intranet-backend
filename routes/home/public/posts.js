@@ -26,7 +26,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     let PostFile;
     let PostFileThumbnail;
     let PostFileResourceType;
-    const { description, audience,title } = req.body;
+    
+    const { description, audience, title } = req.body;
 
     if (req.file) {
         const { originalUrl, thumbnailUrl, blurredUrl, resourceType } = await uploadImage(
@@ -34,12 +35,12 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         );
         console.log('Upload result........:', { originalUrl, thumbnailUrl, blurredUrl, resourceType });
 
-        PostFile             = originalUrl  || null;
-        PostFileThumbnail    = blurredUrl   || thumbnailUrl || null;
+        PostFile = originalUrl || null;
+        PostFileThumbnail = blurredUrl || thumbnailUrl || null;
         PostFileResourceType = resourceType || null;
     }
 
-    
+
 
     // Parse audienceList — app sends it as a JSON string via FormData
     let audienceList = [];
@@ -53,8 +54,8 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     }
 
     const postedById = req.user.Id;
-    const role       = req.user.role;
-    const io         = req.app.get('io');
+    const role = req.user.role;
+    const io = req.app.get('io');
 
     // ── helper: insert audience into postaudience table ──────────────
     //
@@ -90,55 +91,84 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     // ── helper: emit socket to correct personalized room ──────────────────────────
     function emitPost(post) {
         if (!post) return console.log("Post not found for socket emission");
-        if (audience === 'all')      io.to('all').emit('newPost', post);
-        if (audience === 'staff')    io.to('staff').emit('newPost', post);
-        if(audienceList.length > 0 && audience === 'students'){
-            audienceList.forEach(target=>{
+        if (audience === 'all') io.to('all').emit('newPost', post);
+        if (audience === 'staff') io.to('staff').emit('newPost', post);
+        if (audienceList.length > 0 && audience === 'students') {
+            audienceList.forEach(target => {
                 io.to(target).emit('newPost', post);
-                    console.log(`Emitted newPost to ${target} room for post ${post.Id}`);
+                console.log(`Emitted newPost to ${target} room for post ${post.Id}`);
             })
         }
     }
     // ─────────────────────────────────────────────────────────────────
 
     // ── helper: send to alumni via Brevo ─────────────────────────────
-    async function sendToAlumni(subject,title, message) {
+    async function sendToAlumni(subject, title, message, attachments = []) {
+        // attachments: array of { url, name } objects from Cloudinary
+        // e.g. [{ url: 'https://res.cloudinary.com/...', name: 'report.pdf' }]
+
         const db = await connectionPromise;
         const [alumniList] = await db.query(
             `SELECT Names, Email FROM alumni WHERE OptedOut = 0`
         );
-        console.log("client emails",alumniList);
+        console.log("client emails", alumniList);
 
         if (alumniList.length === 0) return { sent: 0, failed: 0 };
+
+        // --- Fetch and encode attachments once (not per recipient) ---
+        let encodedAttachments = [];
+        if (attachments.length > 0) {
+            encodedAttachments = await Promise.all(
+                attachments.map(async ({ url, name }) => {
+                    const fileRes = await fetch(url);
+                    if (!fileRes.ok) throw new Error(`Failed to fetch attachment: ${url}`);
+                    const buffer = await fileRes.arrayBuffer();
+                    const base64 = Buffer.from(buffer).toString('base64');
+                    return { name, content: base64 };
+                })
+            );
+        }
 
         let sent = 0, failed = 0;
 
         for (const person of alumniList) {
             try {
+                const emailPayload = {
+                    sender: { name: 'AUCA Communications', email: 'danieljospin087@gmail.com' },
+                    to: [{ email: person.Email, name: person.Names }],
+                    subject,
+                    htmlContent: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
+                        <h2 style="color: #003366;">${title}</h2>
+                        <p style="font-size: 15px; line-height: 1.6;">${message}</p>
+                        <hr style="margin-top: 30px;"/>
+                        <small style="color: #999;">
+                            You are receiving this as an AUCA alumnus.
+                            <a href="${process.env.APP_URL}/unsubscribe?email=${encodeURIComponent(person.Email)}">Unsubscribe</a>
+                        </small>
+                    </div>
+                `,
+                    // Only include attachment field if there are attachments
+                    ...(encodedAttachments.length > 0 && { attachment: encodedAttachments }),
+                };
+
                 const response = await fetch('https://api.brevo.com/v3/smtp/email', {
                     method: 'POST',
                     headers: {
                         'api-key': process.env.BREVO_API_KEY,
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        sender: { name: 'AUCA Communications', email: 'danieljospin087@gmail.com' },
-                        to: [{ email: person.Email, name: person.Names }],
-                        subject,
-                        htmlContent: `
-                            <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
-                                <h2 style="color: #003366;">${title}</h2>
-                                <p style="font-size: 15px; line-height: 1.6;">${message}</p>
-                                <hr style="margin-top: 30px;"/>
-                                <small style="color: #999;">
-                                    You are receiving this as an AUCA alumnus.
-                                    <a href="${process.env.APP_URL}/unsubscribe?email=${encodeURIComponent(person.Email)}">Unsubscribe</a>
-                                </small>
-                            </div>
-                        `,
-                    }),
+                    body: JSON.stringify(emailPayload),
                 });
-                response.ok ? sent++ : failed++;
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    console.error(`Brevo error for ${person.Email}:`, err);
+                    failed++;
+                } else {
+                    sent++;
+                }
+
             } catch (err) {
                 console.error(`Failed to send to ${person.Email}:`, err.message);
                 failed++;
@@ -173,11 +203,11 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
         // ── 3. Store file if attached ─────────────────────────────────
         if (PostFile) {
-            const fileType     = path.extname(req.file.originalname).toLowerCase();
+            const fileType = path.extname(req.file.originalname).toLowerCase();
             console.log('Processing file for post:', { PostId, fileType, PostFileThumbnail, PostFile });
             const fileMimeType = req.file.mimetype;
-            const fileSize     = fileSizeFormat(req.file.size);
-            const fileName       = req.file.originalname;
+            const fileSize = fileSizeFormat(req.file.size);
+            const fileName = req.file.originalname;
             console.log('Storing file for post:', { PostId, fileType, PostFileThumbnail, PostFile, fileMimeType, fileSize, fileName });
 
             await connectionPromise.query(
@@ -189,7 +219,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
         // ── 4. Alumni: send emails instead of socket ──────────────────
         if (audience === 'alumni') {
-            const { sent, failed } = await sendToAlumni('New announcement from AUCA', Title, description);
+            const { sent, failed } = PostFile ? await sendToAlumni('New announcement from AUCA', title, description,  [{ url: PostFile, name: req.file.originalname }]) : await sendToAlumni('New announcement from AUCA', title, description);
             return res.status(201).json({
                 message: 'Post created and emails sent to alumni',
                 postId: PostId,
@@ -207,10 +237,10 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             message: 'Post created successfully',
             postId: PostId,
             post,
-            thumbnailUrl:  PostFileThumbnail  || null,
-            fullUrl:       PostFile           || null,
-            fileSize:      req.file ? fileSizeFormat(req.file.size) : null,
-            resourceType:  PostFileResourceType || null,
+            thumbnailUrl: PostFileThumbnail || null,
+            fullUrl: PostFile || null,
+            fileSize: req.file ? fileSizeFormat(req.file.size) : null,
+            resourceType: PostFileResourceType || null,
             audienceList,
         });
 
@@ -228,9 +258,9 @@ router.get('/', Authenticate, async (req, res) => {
     let userFaculty = req.user.Faculty;
     let userDepartment = req.user.Department;
     let userStudyLevel = req.user.StudyLevel;
-    userFaculty=userFaculty ? userFaculty.toLowerCase() : null;
-    userDepartment=userDepartment ? userDepartment.toLowerCase() : null;
-    userStudyLevel=userStudyLevel ? userStudyLevel.toLowerCase() : null;
+    userFaculty = userFaculty ? userFaculty.toLowerCase() : null;
+    userDepartment = userDepartment ? userDepartment.toLowerCase() : null;
+    userStudyLevel = userStudyLevel ? userStudyLevel.toLowerCase() : null;
     console.log('User info:', { id, userRole, userFaculty, userDepartment, userStudyLevel });
 
     console.log('Raw since parameter:', userLastOnlineTimestamp);
@@ -309,7 +339,7 @@ ORDER BY p.Timestamp DESC
             `;
 
 
-            const studentsQuery=`
+            const studentsQuery = `
                 SELECT 
     p.Id,
     CASE 
@@ -364,10 +394,10 @@ ORDER BY p.Timestamp DESC
             var posts;
 
             if (userRole === 'staff') {
-                 [posts] = await connectionPromise.query(staffQuery, [ userLastOnlineDate]);
+                [posts] = await connectionPromise.query(staffQuery, [userLastOnlineDate]);
             }
             if (userRole === 'students') {
-                    [posts] = await connectionPromise.query(studentsQuery, [userStudyLevel,userFaculty,userDepartment, userLastOnlineDate]);
+                [posts] = await connectionPromise.query(studentsQuery, [userStudyLevel, userFaculty, userDepartment, userLastOnlineDate]);
             }
 
             console.log('Query result count:', posts.length);
@@ -398,7 +428,7 @@ ORDER BY p.Timestamp DESC
         try {
             await connectionPromise.query("SET time_zone = '+00:00'");
             var posts;
-            var studentsQuery=`
+            var studentsQuery = `
                 SELECT 
                     p.Id,
                     CASE 
@@ -447,7 +477,7 @@ ORDER BY p.Timestamp DESC
                          f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType,st.Department
                 ORDER BY p.Timestamp DESC
             `;
-            var staffQuery=`
+            var staffQuery = `
                 SELECT 
                     p.Id,
                     CASE 
@@ -497,12 +527,12 @@ ORDER BY p.Timestamp DESC
                 ORDER BY p.Timestamp DESC
             `;
 
-             if (userRole === 'staff') {
-                    [posts] = await connectionPromise.query(staffQuery);
-             }
-                if (userRole === 'students') {
-                    [posts] = await connectionPromise.query(studentsQuery, [userStudyLevel,userFaculty,userDepartment]);
-                }
+            if (userRole === 'staff') {
+                [posts] = await connectionPromise.query(staffQuery);
+            }
+            if (userRole === 'students') {
+                [posts] = await connectionPromise.query(studentsQuery, [userStudyLevel, userFaculty, userDepartment]);
+            }
 
             // Format timestamps to ISO strings for consistency
             const formattedPosts = posts.map(post => ({
