@@ -222,9 +222,12 @@ router.get('/', Authenticate, async (req, res) => {
     const id = req.user.Id;
     const userRole = req.user.role == 'staff' ? 'staff' : 'students';
     const userLastOnlineTimestamp = req.query.since;
-    const userFaculty = req.user.Faculty.toLowerCase();
-    const userDepartment = req.user.Department.toLowerCase();
-    const userStudyLevel = req.user.StudyLevel.toLowerCase();
+    const userFaculty = req.user.Faculty;
+    const userDepartment = req.user.Department;
+    const userStudyLevel = req.user.StudyLevel;
+    userFaculty=userFaculty ? userFaculty.toLowerCase() : null;
+    userDepartment=userDepartment ? userDepartment.toLowerCase() : null;
+    userStudyLevel=userStudyLevel ? userStudyLevel.toLowerCase() : null;
     console.log('User info:', { id, userRole, userFaculty, userDepartment, userStudyLevel });
 
     console.log('Raw since parameter:', userLastOnlineTimestamp);
