@@ -201,11 +201,11 @@ module.exports = async (io) => {
                     console.log('user is staff, joining staff room');
                 } else {
                     socket.join('students');
-                    socket.join(socket.user.StudyLevel);
-                    socket.join(socket.user.Faculty);
+                    socket.join(socket.user.StudyLevel.toLowerCase());
+                    socket.join(socket.user.Faculty.toLowerCase());
                     socket.join(socket.user.Department.toLowerCase());
                     console.log('user is student, joining student room');
-                    console.log(`user joined rooms: students, ${socket.user.StudyLevel.toLowerCase()}, ${socket.user.Faculty}, ${socket.user.Department.toLowerCase()}`);
+                    console.log(`user joined rooms: students, ${socket.user.StudyLevel.toLowerCase()}, ${socket.user.Faculty.toLowerCase()}, ${socket.user.Department.toLowerCase()}`);
                 }
             } catch (err) {
                 console.warn('[socket] joining announcement rooms failed', err);

@@ -38,7 +38,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         PostFileResourceType = resourceType || null;
     }
 
-    const { description, audience } = req.body;
+    const { description, audience,Title } = req.body;
 
     // Parse audienceList — app sends it as a JSON string via FormData
     let audienceList = [];
@@ -73,7 +73,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
             const values = audienceList.map(target => [PostId, target]);
             await connectionPromise.query(
                 `INSERT INTO postaudience (PostId, AudienceType) VALUES ?`,
-                [values]
+                [values.map(v => v.toLowerCase())]
             );
             console.log(`Precision audience stored for post ${PostId}:`, audienceList);
         } else {
@@ -101,7 +101,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     // ─────────────────────────────────────────────────────────────────
 
     // ── helper: send to alumni via Brevo ─────────────────────────────
-    async function sendToAlumni(subject, message) {
+    async function sendToAlumni(subject,Title, message) {
         const db = await connectionPromise;
         const [alumniList] = await db.query(
             `SELECT Names, Email FROM alumni WHERE OptedOut = 0`
@@ -126,7 +126,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                         subject,
                         htmlContent: `
                             <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
-                                <h2 style="color: #003366;">AUCA Communications</h2>
+                                <h2 style="color: #003366;">${Title}</h2>
                                 <p style="font-size: 15px; line-height: 1.6;">${message}</p>
                                 <hr style="margin-top: 30px;"/>
                                 <small style="color: #999;">
@@ -152,14 +152,14 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     try {
         await connectionPromise.query("SET time_zone = '+00:00'");
 
-        if (!description || !audience) {
+        if (!description || !audience || !Title) {
             return res.status(400).json({ message: 'Please provide all required fields.' });
         }
 
         // ── 1. Create the post ────────────────────────────────────────
         const [insert] = await connectionPromise.query(
-            `INSERT INTO posts (CreatorId, Description, PostedBy,Audience) VALUES (?, ?, ?, ?)`,
-            [postedById, description, role, audience]
+            `INSERT INTO posts (CreatorId,Title, Description, PostedBy,Audience) VALUES (?, ?, ?, ?, ?)`,
+            [postedById, Title, description, role, audience]
         );
         if (!insert) return res.status(500).json({ message: 'Error creating post.' });
 
@@ -186,7 +186,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
 
         // ── 4. Alumni: send emails instead of socket ──────────────────
         if (audience === 'alumni') {
-            const { sent, failed } = await sendToAlumni('New announcement from AUCA', description);
+            const { sent, failed } = await sendToAlumni('New announcement from AUCA', Title, description);
             return res.status(201).json({
                 message: 'Post created and emails sent to alumni',
                 postId: PostId,
@@ -222,9 +222,10 @@ router.get('/', Authenticate, async (req, res) => {
     const id = req.user.Id;
     const userRole = req.user.role == 'staff' ? 'staff' : 'students';
     const userLastOnlineTimestamp = req.query.since;
-    const userFaculty = req.user.Faculty;
-    const userDepartment = req.user.Department;
-    const userStudyLevel = req.user.StudyLevel;
+    const userFaculty = req.user.Faculty.toLowerCase();
+    const userDepartment = req.user.Department.toLowerCase();
+    const userStudyLevel = req.user.StudyLevel.toLowerCase();
+    console.log('User info:', { id, userRole, userFaculty, userDepartment, userStudyLevel });
 
     console.log('Raw since parameter:', userLastOnlineTimestamp);
 
