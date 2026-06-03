@@ -24,7 +24,7 @@ async function getPostById(postId) {
         WHEN s.StudentId IS NOT NULL THEN 'Student' 
         ELSE st.Role 
     END AS Role,
-    p.title,
+    p.Title,
     p.Description,
     p.Timestamp,
     f.FileType,
@@ -46,7 +46,7 @@ INNER JOIN postaudience pa ON pa.PostId = p.Id
 WHERE p.Id = ?
 GROUP BY p.Id, s.StudentId, s.Fname, s.Lname, s.ProfileUrl, 
          st.Id, st.Fname, st.Lname, st.ProfileUrl, st.Role,
-         p.CreatorId,p.title, p.Description, p.Timestamp, f.FileType,f.FileName,
+         p.CreatorId,p.Title, p.Description, p.Timestamp, f.FileType,f.FileName,
          f.ThumbnailUrl, f.FullUrl, f.FileSize, f.MimeType, pa.AudienceType, st.Department
 ORDER BY p.Timestamp DESC
     `, [postId]);
