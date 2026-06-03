@@ -26,7 +26,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     let PostFile;
     let PostFileThumbnail;
     let PostFileResourceType;
-    const { description, audience,Title } = req.body;
+    const { description, audience,title } = req.body;
 
     if (req.file) {
         const { originalUrl, thumbnailUrl, blurredUrl, resourceType } = await uploadImage(
@@ -153,7 +153,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     try {
         await connectionPromise.query("SET time_zone = '+00:00'");
 
-        if (!audience || !Title) {
+        if (!audience || !title) {
             return res.status(400).json({ message: 'Please provide all required fields.' });
         }
 
