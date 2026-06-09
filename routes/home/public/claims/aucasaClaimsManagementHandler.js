@@ -39,13 +39,13 @@ router.put('/review',Authenticate,async(req,res)=>{
 });
 
 //creating get route for aucasa minister of communication to get all claims of a particular ClaimCategory,number of ClaimSupports for each claim and also the details of each claim including student names,profile image and id
-router.get('/categories/:claimCategory',Authenticate,async(req,res)=>{
-    const {claimCategory}=req.params;
-    if(!claimCategory){
-        return res.status(400).json({message:'claimCategory is required'});
+router.get('/categories/:claimCategoryId',Authenticate,async(req,res)=>{
+    const {claimCategoryId}=req.params;
+    if(!claimCategoryId){
+        return res.status(400).json({message:'claimCategoryId is required'});
     }
     try{
-        const [claims]=await connectionPromise.query(`select c.ClaimId, c.PostId, c.StudentId,s.Lname,s.ProfileUrl, c.ClaimText, c.ClaimEvidenceUrl, c.VisibilityStatus, c.ClaimStatus,c.DateCreated, (select count(*) from claimSupport where ClaimId=c.ClaimId) as NumberOfSupports from claims c join students s on c.StudentId=s.StudentId where c.Category=?`,[claimCategory]);
+        const [claims]=await connectionPromise.query(`select c.ClaimId, c.PostId, c.StudentId,s.Lname,s.ProfileUrl, c.ClaimText, c.ClaimEvidenceUrl, c.VisibilityStatus, c.ClaimStatus,c.DateCreated, (select count(*) from claimSupport where ClaimId=c.ClaimId) as NumberOfSupports from claims c join students s on c.StudentId=s.StudentId where c.CategoryId=?`,[claimCategoryId]);
         return res.status(200).json({ claims });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching claims',error: error.message });
@@ -92,7 +92,7 @@ router.get('/post/:postId/claims', Authenticate, async (req, res) => {
                 s.Lname,
                 s.ProfileUrl,
                 c.ClaimText,
-                c.Category,
+                cc.CategoryName,
                 c.ClaimEvidenceUrl,
                 c.VisibilityStatus,
                 c.ClaimStatus,
@@ -100,6 +100,7 @@ router.get('/post/:postId/claims', Authenticate, async (req, res) => {
                 (SELECT COUNT(*) FROM claimSupport cs WHERE cs.ClaimId = c.ClaimId) AS NumberOfSupports
             FROM claims c
             JOIN students s ON c.StudentId = s.StudentId
+            JOIN claimCategory cc ON c.CategoryId = cc.CategoryId
             WHERE c.PostId = ?
             ORDER BY c.DateCreated DESC
         `, [postId]);
