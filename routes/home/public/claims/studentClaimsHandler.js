@@ -16,8 +16,9 @@ const upload = require("../../../../fileHandler/upload");
 router.post('/newClaim',upload.single('ClaimEvidenceImageFile'),Authenticate,async(req,res)=>{
     const {PostId,ClaimText,ClaimCategoryId,NewClaimCategoryText,ClaimVisibility}=req.body;  //claim category can be either existing category id or new category text, if the student want to create a new category they will provide the new category text and leave the category id empty, if they want to use existing category they will provide the category id and leave the new category text empty.
     const userId=req.user.Id;
+    console.log("Received claim submission:", { PostId, ClaimText, ClaimCategoryId, NewClaimCategoryText, ClaimVisibility, userId });
     let ClaimEvidenceImageFile=null;
-    if(!PostId || typeof(PostId) !== 'number' || !ClaimText || (!ClaimCategoryId && !NewClaimCategoryText) || !ClaimVisibility || (ClaimVisibility !== 'public' && ClaimVisibility !== 'private')){
+    if(!PostId || !ClaimText || (!ClaimCategoryId && !NewClaimCategoryText) || !ClaimVisibility || (ClaimVisibility !== 'public' && ClaimVisibility !== 'private')){
         return res.status(400).json({message:'PostId, ClaimText, Category and ClaimVisibility are required'});
     }
     
@@ -67,11 +68,11 @@ router.get('/categories',Authenticate,async(req,res)=>{
         return res.status(400).json({message:'PostId is required or its not valid'});
     }
     try{
-        const [claimCategories]=await connectionPromise.query(`select CategoryId, CategoryName, count(*) as NumberOfClaims from claims join claimCategory on claims.CategoryId = claimCategory.CategoryId where claims.PostId=? group by CategoryId, CategoryName`,[PostId]);
+        const [claimCategories]=await connectionPromise.query(`select c.CategoryId, cc.CategoryName, count(*) as NumberOfClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.PostId=? group by c.CategoryId, cc.CategoryName`,[PostId]);
         return res.status(200).json(claimCategories);
     
     }catch (error) {
-        return res.status(500).json({message:'Error fetching claim categories'});
+        return res.status(500).json({message:'Error fetching claim categories', error: error.message});
     }
 });
 
@@ -90,7 +91,7 @@ router.get('/categories/:claimCategoryId',Authenticate,async(req,res)=>{
         const [claims]=await connectionPromise.query(`select claims.*,s.Lname, count(claimSupport.ClaimId) as NumberOfSupports from claims left join claimSupport on claims.ClaimId = claimSupport.ClaimId left join students s on claims.StudentId = s.StudentId where claims.CategoryId=? group by claims.ClaimId`,[claimCategoryId]);
         return res.status(200).json(claims);
     }catch (error) {
-        return res.status(500).json({message:`Error fetching claims in category ${claimCategoryId}`});
+        return res.status(500).json({message:`Error fetching claims in category ${claimCategoryId}`, error: error.message});
     }
 });
 
@@ -113,7 +114,7 @@ router.post('/newClaimSupport',Authenticate,async(req,res)=>{
         return res.status(200).json({message:'Claim supported successfully'});
     } catch (error) {
         console.error('Error checking claim support:', error);
-        return res.status(500).json({message:'Error checking claim support'});
+        return res.status(500).json({message:'Error checking claim support', error: error.message});
     }
 });
 
@@ -135,7 +136,7 @@ router.delete('/deleteClaim/:claimId',Authenticate,async(req,res)=>{
         await connectionPromise.query(`delete from claims where ClaimId=? and StudentId=?`,[claimId, req.user.Id]);
         return res.status(200).json({message:'Claim deleted successfully'});
     } catch (error) {
-        return res.status(500).json({message:'Error deleting claim'});
+        return res.status(500).json({message:'Error deleting claim', error: error.message});
     }
 });
 
