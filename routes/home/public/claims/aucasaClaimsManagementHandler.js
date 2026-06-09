@@ -2,7 +2,6 @@ const express=require('express');
 const router=express.Router();
 const connectionPromise=require('../../../../database & models/databaseConnection');
 const {Authenticate}=require('../../../../Authentication/authentication');
-const multer=require('multer');
 
 
 //creating a get route for aucasa minister of communication to get total number of posts which are active,total number of claims of those active posts and total number of unreviewed claims of those active posts,
@@ -53,5 +52,84 @@ router.get('/categories/:claimCategory',Authenticate,async(req,res)=>{
     }
 });
 
-module.exports=router;
+// GET /postsWithClaims — fetches all posts that have at least one claim, ordered by claim count desc.
+// Used by AUCASADashboard left feed.
+router.get('/postsWithClaims', Authenticate, async (req, res) => {
+    try {
+        const [posts] = await connectionPromise.query(`
+            SELECT
+                p.Id,
+                p.Title,
+                p.Description,
+                p.Timestamp,
+                p.ClaimSummary,
+                COUNT(c.ClaimId) AS claimsCount
+            FROM posts p
+            INNER JOIN claims c ON c.PostId = p.Id
+            GROUP BY p.Id, p.Title, p.Description, p.Timestamp, p.ClaimSummary
+            ORDER BY claimsCount DESC
+        `);
+        return res.status(200).json({ posts });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching posts with claims', error: error.message });
+    }
+});
 
+// GET /post/:postId/claims — fetches all claims for a specific post with student details and support count.
+// Used by AUCASADashboard right panel and ClaimDetails page.
+router.get('/post/:postId/claims', Authenticate, async (req, res) => {
+    const postId = Number(req.params.postId);
+    if (!postId || isNaN(postId)) {
+        return res.status(400).json({ message: 'postId is required and must be a valid number' });
+    }
+    try {
+        const [claims] = await connectionPromise.query(`
+            SELECT
+                c.ClaimId,
+                c.PostId,
+                c.StudentId,
+                s.Fname,
+                s.Lname,
+                s.ProfileUrl,
+                c.ClaimText,
+                c.Category,
+                c.ClaimEvidenceUrl,
+                c.VisibilityStatus,
+                c.ClaimStatus,
+                c.DateCreated,
+                (SELECT COUNT(*) FROM claimSupport cs WHERE cs.ClaimId = c.ClaimId) AS NumberOfSupports
+            FROM claims c
+            JOIN students s ON c.StudentId = s.StudentId
+            WHERE c.PostId = ?
+            ORDER BY c.DateCreated DESC
+        `, [postId]);
+        return res.status(200).json({ claims });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching claims for post', error: error.message });
+    }
+});
+
+// PATCH /post/:postId/summary — saves the minister's claim summary text for a post.
+// Requires the ClaimSummary column on the posts table (TEXT, nullable).
+router.patch('/post/:postId/summary', Authenticate, async (req, res) => {
+    const postId = Number(req.params.postId);
+    const { ClaimSummary } = req.body;
+    const aucasaUserRole = req.user.aucasaUserRole;
+    if (aucasaUserRole !== 'information and communication') {
+        return res.status(403).json({ message: 'Access denied. Only minister of communication can save summaries.' });
+    }
+    if (!postId || isNaN(postId)) {
+        return res.status(400).json({ message: 'postId is required and must be a valid number' });
+    }
+    if (ClaimSummary === undefined || ClaimSummary === null) {
+        return res.status(400).json({ message: 'ClaimSummary text is required' });
+    }
+    try {
+        await connectionPromise.query(`UPDATE posts SET ClaimSummary = ? WHERE Id = ?`, [ClaimSummary, postId]);
+        return res.status(200).json({ message: 'Summary saved successfully' });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error saving summary', error: error.message });
+    }
+});
+
+module.exports=router;

@@ -43,8 +43,8 @@ router.post('/newClaim',upload.single('ClaimEvidenceImageFile'),Authenticate,asy
 //creating get claim route that will be used by students to get claimCategories and number of claims under each category of a particular post, this will help students to decide which category to choose when submitting a claim, and also to know how many claims are there under each category for a particular post
 
 router.get('/categories',Authenticate,async(req,res)=>{
-    const {PostId}=req.body;
-    if(!PostId || typeof(PostId) !== 'number'){
+    const PostId = Number(req.query.PostId);
+    if(!PostId || isNaN(PostId)){
         return res.status(400).json({message:'PostId is required or its not valid'});
     }
     try{
