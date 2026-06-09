@@ -36,7 +36,7 @@ router.post('/newClaim',upload.single('ClaimEvidenceImageFile'),Authenticate,asy
             console.log("claim submitted successfully")
         return res.status(201).json({message:'Claim submitted successfully'});
         }
-        else{
+        if(NewClaimCategoryText && !ClaimCategoryId){
             //check if the new categoryName have number of text more than 100 characters
             if(NewClaimCategoryText.length > 100){
                 return res.status(400).json({message:'New category name should be less than 100 characters'});
@@ -49,6 +49,9 @@ router.post('/newClaim',upload.single('ClaimEvidenceImageFile'),Authenticate,asy
             [PostId, userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
             console.log("claim submitted successfully")
         return res.status(201).json({message:'Claim submitted successfully'});
+        }
+        else{
+            return res.status(400).json({message:'Invalid claim category data'});
         }
     } catch (error) {
         return res.status(500).json({message:'Error submitting claim', error: error.message});
@@ -79,6 +82,11 @@ router.get('/categories/:claimCategoryId',Authenticate,async(req,res)=>{
         return res.status(400).json({message:'ClaimCategoryId is required'});
     }
     try{
+        //check if the claimCategoryId is valid and exist in the database
+        const [category]=await connectionPromise.query(`select * from claimCategory where CategoryId=?`,[claimCategoryId]);
+        if(category.length === 0){
+            return res.status(404).json({message:'Claim category not found'});
+        }
         const [claims]=await connectionPromise.query(`select claims.*,s.Lname, count(claimSupport.ClaimId) as NumberOfSupports from claims left join claimSupport on claims.ClaimId = claimSupport.ClaimId left join students s on claims.StudentId = s.StudentId where claims.CategoryId=? group by claims.ClaimId`,[claimCategoryId]);
         return res.status(200).json(claims);
     }catch (error) {
