@@ -133,8 +133,8 @@ router.post('/newClaimSupport', Authenticate, async (req, res) => {
 
 //creating delete claim route that will be used by students to delete their claim if they want to
 router.delete('/deleteClaim/:claimId', Authenticate, async (req, res) => {
-    const { claimId } = parseInt(req.params.claimId,10);
-    console.log(typeof(claimId));
+    const claimId  = parseInt(req.params.claimId,10);
+    
     //validate 0 claimId and db error code: code: 'ER_NO_REFERENCED_ROW_2'
     if (!claimId || typeof (claimId) !== 'number') {
         return res.status(400).json({ message: 'ClaimId is required or its not valid' });
