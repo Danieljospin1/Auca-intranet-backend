@@ -79,6 +79,7 @@ router.get('/categories', Authenticate, async (req, res) => {
 //creating get claims route to get all claims of a particular category id and number of supports for each claim,student names, student ids,this will help students to know which claim is more supported by other students and also to know the details of each claim before supporting it
 router.get('/categories/:claimCategoryId', Authenticate, async (req, res) => {
     const { claimCategoryId } = req.params;
+    const userId=req.user.Id;
     if (!claimCategoryId) {
         return res.status(400).json({ message: 'ClaimCategoryId is required' });
     }
@@ -98,7 +99,7 @@ FROM claims
 LEFT JOIN claimSupport cs ON claims.ClaimId = cs.ClaimId
 LEFT JOIN students s ON claims.StudentId = s.StudentId
 WHERE claims.CategoryId = ?
-GROUP BY claims.ClaimId`, [claimCategoryId]);
+GROUP BY claims.ClaimId`, [userId,userId,claimCategoryId]);
         return res.status(200).json(claims);
     } catch (error) {
         return res.status(500).json({ message: `Error fetching claims in category ${claimCategoryId}`, error: error.message });
