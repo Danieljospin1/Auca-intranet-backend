@@ -68,7 +68,7 @@ router.get('/categories', Authenticate, async (req, res) => {
         return res.status(400).json({ message: 'PostId is required or its not valid' });
     }
     try {
-        const [claimCategories] = await connectionPromise.query(`select c.CategoryId, cc.CategoryName, count(*) as NumberOfClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.PostId=? group by c.CategoryId, cc.CategoryName`, [PostId]);
+        const [claimCategories] = await connectionPromise.query(`select cc.CategoryId, cc.CategoryName, count(*) as NumberOfClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.PostId=? group by c.CategoryId, cc.CategoryName,`, [PostId]);
         return res.status(200).json(claimCategories);
 
     } catch (error) {
@@ -98,8 +98,8 @@ router.get('/categories/:claimCategoryId', Authenticate, async (req, res) => {
 FROM claims
 LEFT JOIN claimSupport cs ON claims.ClaimId = cs.ClaimId
 LEFT JOIN students s ON claims.StudentId = s.StudentId
-WHERE claims.CategoryId = ?
-GROUP BY claims.ClaimId`, [userId,userId,claimCategoryId]);
+WHERE claims.CategoryId = ? and claims.PostId=?
+GROUP BY claims.ClaimId`, [userId,userId,claimCategoryId,]);
         return res.status(200).json(claims);
     } catch (error) {
         return res.status(500).json({ message: `Error fetching claims in category ${claimCategoryId}`, error: error.message });
