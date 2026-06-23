@@ -14,8 +14,10 @@ const upload = require("../../../../fileHandler/upload");
 //4-ClaimEvidenceImageFile (not a must)
 //5-ClaimVisibility(a must) (public or private)
 router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, async (req, res) => {
-    const { PostId, ClaimText, ClaimCategoryId, NewClaimCategoryText, ClaimVisibility } = req.body;  //claim category can be either existing category id or new category text, if the student want to create a new category they will provide the new category text and leave the category id empty, if they want to use existing category they will provide the category id and leave the new category text empty.
+    const { ClaimText, NewClaimCategoryText, ClaimVisibility } = req.body;  //claim category can be either existing category id or new category text, if the student want to create a new category they will provide the new category text and leave the category id empty, if they want to use existing category they will provide the category id and leave the new category text empty.
     const userId = req.user.Id;
+    const PostId=Number(req.body.PostId);
+    const ClaimCategoryId=Number(req.body.ClaimCategoryId);
     
     console.log("Received claim submission:", { PostId, ClaimText, ClaimCategoryId, NewClaimCategoryText, ClaimVisibility, userId });
     let ClaimEvidenceImageFile = null;
