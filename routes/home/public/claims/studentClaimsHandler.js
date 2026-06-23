@@ -32,8 +32,8 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
     }
     try {
         if (ClaimCategoryId) {
-            await connectionPromise.query(`insert into claims (PostId,StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?,?)`,
-                [PostId, userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
+            await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
+                [ userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
             console.log("claim submitted successfully")
             return res.status(201).json({ message: 'Claim submitted successfully' });
         }
@@ -46,8 +46,8 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
             const [newCategoryResult] = await connectionPromise.query(`insert into claimCategory (postId,CreatedById,CategoryName) values (?,?,?)`, [PostId, userId, NewClaimCategoryText]);
             const newCategoryId = newCategoryResult.insertId;
             //insert the claim with the new category id
-            await connectionPromise.query(`insert into claims (PostId,StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?,?)`,
-                [PostId, userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
+            await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
+                [ userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
             console.log("claim submitted successfully")
             return res.status(201).json({ message: 'Claim submitted successfully' });
         }
@@ -74,8 +74,7 @@ router.get('/categories', Authenticate, async (req, res) => {
     COUNT(c.ClaimId) AS NumberOfClaims
 FROM claimCategory cc
 LEFT JOIN claims c
-    ON c.CategoryId = cc.CategoryId
-    AND c.PostId = ?
+    ON c.CategoryId = cc.CategoryId when cc.PostId=?
 GROUP BY cc.CategoryId, cc.CategoryName
 ORDER BY cc.CategoryName`, [PostId]);
         return res.status(200).json(claimCategories);
