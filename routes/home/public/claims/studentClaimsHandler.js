@@ -16,6 +16,7 @@ const upload = require("../../../../fileHandler/upload");
 router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, async (req, res) => {
     const { PostId, ClaimText, ClaimCategoryId, NewClaimCategoryText, ClaimVisibility } = req.body;  //claim category can be either existing category id or new category text, if the student want to create a new category they will provide the new category text and leave the category id empty, if they want to use existing category they will provide the category id and leave the new category text empty.
     const userId = req.user.Id;
+    
     console.log("Received claim submission:", { PostId, ClaimText, ClaimCategoryId, NewClaimCategoryText, ClaimVisibility, userId });
     let ClaimEvidenceImageFile = null;
     if (!PostId || !ClaimText || (!ClaimCategoryId && !NewClaimCategoryText) || !ClaimVisibility || (ClaimVisibility !== 'public' && ClaimVisibility !== 'private')) {
@@ -32,13 +33,14 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
     }
     try {
         if (ClaimCategoryId) {
+            console.log("claim category type",typeof(ClaimCategoryId))
             console.log("claim category is available..........")
             await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
                 [userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
             console.log("claim submitted successfully")
             return res.status(201).json({ message: 'Claim submitted successfully!' });
         }
-        if (!ClaimCategoryId && NewClaimCategoryText ) {
+        if (!ClaimCategoryId && (NewClaimCategoryText===undefined || NewClaimCategoryText===null) ) {
             //check if the new categoryName have number of text more than 100 characters
             if (NewClaimCategoryText.length > 50) {
                 return res.status(400).json({ message: 'New category name should be less than 100 characters' });
