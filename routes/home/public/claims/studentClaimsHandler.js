@@ -74,7 +74,7 @@ router.get('/categories', Authenticate, async (req, res) => {
     COUNT(c.ClaimId) AS NumberOfClaims
 FROM claimCategory cc
 LEFT JOIN claims c
-    ON c.CategoryId = cc.CategoryId when cc.PostId=?
+    ON c.CategoryId = cc.CategoryId where cc.PostId=?
 GROUP BY cc.CategoryId, cc.CategoryName
 ORDER BY cc.CategoryName`, [PostId]);
         return res.status(200).json(claimCategories);
