@@ -68,7 +68,16 @@ router.get('/categories', Authenticate, async (req, res) => {
         return res.status(400).json({ message: 'PostId is required or its not valid' });
     }
     try {
-        const [claimCategories] = await connectionPromise.query(`select cc.CategoryId, cc.CategoryName, count(*) as NumberOfClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.PostId=? group by cc.CategoryId, cc.CategoryName,`, [PostId]);
+        const [claimCategories] = await connectionPromise.query(`SELECT
+    cc.CategoryId,
+    cc.CategoryName,
+    COUNT(c.ClaimId) AS NumberOfClaims
+FROM claimCategory cc
+LEFT JOIN claims c
+    ON c.CategoryId = cc.CategoryId
+    AND c.PostId = ?
+GROUP BY cc.CategoryId, cc.CategoryName
+ORDER BY cc.CategoryName`, [PostId]);
         return res.status(200).json(claimCategories);
 
     } catch (error) {
@@ -79,7 +88,7 @@ router.get('/categories', Authenticate, async (req, res) => {
 //creating get claims route to get all claims of a particular category id and number of supports for each claim,student names, student ids,this will help students to know which claim is more supported by other students and also to know the details of each claim before supporting it
 router.get('/categories/:claimCategoryId', Authenticate, async (req, res) => {
     const { claimCategoryId } = req.params;
-    const userId=req.user.Id;
+    const userId = req.user.Id;
     if (!claimCategoryId) {
         return res.status(400).json({ message: 'ClaimCategoryId is required' });
     }
@@ -99,7 +108,7 @@ FROM claims
 LEFT JOIN claimSupport cs ON claims.ClaimId = cs.ClaimId
 LEFT JOIN students s ON claims.StudentId = s.StudentId
 WHERE claims.CategoryId = ? and claims.PostId=?
-GROUP BY claims.ClaimId`, [userId,userId,claimCategoryId,]);
+GROUP BY claims.ClaimId`, [userId, userId, claimCategoryId,]);
         return res.status(200).json(claims);
     } catch (error) {
         return res.status(500).json({ message: `Error fetching claims in category ${claimCategoryId}`, error: error.message });
@@ -133,8 +142,8 @@ router.post('/newClaimSupport', Authenticate, async (req, res) => {
 
 //creating delete claim route that will be used by students to delete their claim if they want to
 router.delete('/deleteClaim/:claimId', Authenticate, async (req, res) => {
-    const claimId  = parseInt(req.params.claimId,10);
-    
+    const claimId = parseInt(req.params.claimId, 10);
+
     //validate 0 claimId and db error code: code: 'ER_NO_REFERENCED_ROW_2'
     if (!claimId || typeof (claimId) !== 'number') {
         return res.status(400).json({ message: 'ClaimId is required or its not valid' });
