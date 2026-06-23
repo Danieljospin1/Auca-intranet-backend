@@ -14,62 +14,73 @@ const upload = require("../../../../fileHandler/upload");
 //4-ClaimEvidenceImageFile (not a must)
 //5-ClaimVisibility(a must) (public or private)
 router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, async (req, res) => {
-    const { ClaimText, NewClaimCategoryText, ClaimVisibility } = req.body;  //claim category can be either existing category id or new category text, if the student want to create a new category they will provide the new category text and leave the category id empty, if they want to use existing category they will provide the category id and leave the new category text empty.
+    const { ClaimText, NewClaimCategoryText, ClaimVisibility } = req.body;
     const userId = req.user.Id;
-    const PostId=Number(req.body.PostId);
-    const ClaimCategoryId=Number(req.body.ClaimCategoryId);
-    
+    const PostId = Number(req.body.PostId);
+    const ClaimCategoryId = Number(req.body.ClaimCategoryId);
+
     console.log("Received claim submission:", { PostId, ClaimText, ClaimCategoryId, NewClaimCategoryText, ClaimVisibility, userId });
-    let ClaimEvidenceImageFile = null;
-    if (!PostId || !ClaimText || (!ClaimCategoryId && !NewClaimCategoryText) || !ClaimVisibility || (ClaimVisibility !== 'public' && ClaimVisibility !== 'private')) {
+
+    // ── Validation ───────────────────────────────
+    if (!PostId || !ClaimText || (!ClaimCategoryId && !NewClaimCategoryText) || !ClaimVisibility) {
         return res.status(400).json({ message: 'PostId, ClaimText, Category and ClaimVisibility are required' });
     }
 
+    if (ClaimVisibility !== 'public' && ClaimVisibility !== 'private') {
+        return res.status(400).json({ message: 'ClaimVisibility must be either public or private' });
+    }
+
+    if (!ClaimCategoryId && NewClaimCategoryText && NewClaimCategoryText.length > 50) {
+        return res.status(400).json({ message: 'New category name must be 50 characters or less' });
+    }
+
+    // ── Image upload ─────────────────────────────
+    let ClaimEvidenceImageFile = null;
     if (req.file) {
         try {
             const { originalUrl } = await uploadImage(req.file.buffer, "claims", req.file.mimetype, req.file.originalname);
             ClaimEvidenceImageFile = originalUrl;
         } catch (error) {
+            console.error("Image upload error:", error);
             return res.status(500).json({ message: 'Error uploading image' });
         }
     }
+
     try {
+        // ── Case 1: student uses an existing category ──
         if (ClaimCategoryId) {
-            console.log("claim category type",typeof(ClaimCategoryId))
-            console.log("claim category is available..........")
-            await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
-                [userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
-            console.log("claim submitted successfully")
-            return res.status(201).json({ message: 'Claim submitted successfully!' });
+            await connectionPromise.query(
+                `INSERT INTO claims (StudentId, ClaimText, CategoryId, ClaimEvidenceUrl, VisibilityStatus)
+                 VALUES ( ?, ?, ?, ?, ?)`,
+                [userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]
+            );
+            console.log("Claim submitted with existing category:", ClaimCategoryId);
+            return res.status(201).json({ message: 'Claim submitted successfully' });
         }
-        if (!ClaimCategoryId && (NewClaimCategoryText===undefined || NewClaimCategoryText===null) ) {
-            //check if the new categoryName have number of text more than 100 characters
-            if (NewClaimCategoryText.length > 50) {
-                return res.status(400).json({ message: 'New category name should be less than 100 characters' });
-            }
-            try {
-                //insert the new category to the database and get the new category id
-                const [newCategoryResult] = await connectionPromise.query(`insert into claimCategory (postId,CreatedById,CategoryName) values (?,?,?)`, [PostId, userId, NewClaimCategoryText]);
-                const newCategoryId = newCategoryResult.insertId;
-                //insert the claim with the new category id
-                await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
-                    [userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
-                console.log("claim submitted successfully")
-                return res.status(201).json({ message: 'Claim submitted successfully' });
-            }
-            catch (error) {
-                console.log("error submitting in claims!", error);
-            }
+
+        // ── Case 2: student creates a new category ──
+        if (!ClaimCategoryId && NewClaimCategoryText) {
+            const [newCategoryResult] = await connectionPromise.query(
+                `INSERT INTO claimCategory (PostId, CreatedById, CategoryName)
+                 VALUES (?, ?, ?)`,
+                [PostId, userId, NewClaimCategoryText.trim()]
+            );
+            const newCategoryId = newCategoryResult.insertId;
+
+            await connectionPromise.query(
+                `INSERT INTO claims (StudentId, ClaimText, CategoryId, ClaimEvidenceUrl, VisibilityStatus)
+                 VALUES ( ?, ?, ?, ?, ?)`,
+                [userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]
+            );
+            console.log("Claim submitted with new category:", NewClaimCategoryText);
+            return res.status(201).json({ message: 'Claim submitted successfully' });
         }
-        else {
-            return res.status(400).json({ message: 'Invalid claim category data' });
-        }
+
     } catch (error) {
+        console.error("Error submitting claim:", error);
         return res.status(500).json({ message: 'Error submitting claim', error: error.message });
     }
-
 });
-
 //creating get claim route that will be used by students to get claimCategories ids,category names and number of claims under each category of a particular post, this will help students to decide which category to choose when submitting a claim, and also to know how many claims are there under each category for a particular post
 
 router.get('/categories', Authenticate, async (req, res) => {
