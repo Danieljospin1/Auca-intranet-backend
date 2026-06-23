@@ -32,24 +32,30 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
     }
     try {
         if (ClaimCategoryId) {
+            console.log("claim category is available..........")
             await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
-                [ userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
+                [userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
             console.log("claim submitted successfully")
-            return res.status(201).json({ message: 'Claim submitted successfully' });
+            return res.status(201).json({ message: 'Claim submitted successfully!' });
         }
-        if (NewClaimCategoryText && !ClaimCategoryId) {
+        if (!ClaimCategoryId && NewClaimCategoryText ) {
             //check if the new categoryName have number of text more than 100 characters
-            if (NewClaimCategoryText.length > 100) {
+            if (NewClaimCategoryText.length > 50) {
                 return res.status(400).json({ message: 'New category name should be less than 100 characters' });
             }
-            //insert the new category to the database and get the new category id
-            const [newCategoryResult] = await connectionPromise.query(`insert into claimCategory (postId,CreatedById,CategoryName) values (?,?,?)`, [PostId, userId, NewClaimCategoryText]);
-            const newCategoryId = newCategoryResult.insertId;
-            //insert the claim with the new category id
-            await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
-                [ userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
-            console.log("claim submitted successfully")
-            return res.status(201).json({ message: 'Claim submitted successfully' });
+            try {
+                //insert the new category to the database and get the new category id
+                const [newCategoryResult] = await connectionPromise.query(`insert into claimCategory (postId,CreatedById,CategoryName) values (?,?,?)`, [PostId, userId, NewClaimCategoryText]);
+                const newCategoryId = newCategoryResult.insertId;
+                //insert the claim with the new category id
+                await connectionPromise.query(`insert into claims (StudentId, ClaimText,CategoryId, ClaimEvidenceUrl,VisibilityStatus) values (?,?,?,?,?)`,
+                    [userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]);
+                console.log("claim submitted successfully")
+                return res.status(201).json({ message: 'Claim submitted successfully' });
+            }
+            catch (error) {
+                console.log("error submitting in claims!", error);
+            }
         }
         else {
             return res.status(400).json({ message: 'Invalid claim category data' });
