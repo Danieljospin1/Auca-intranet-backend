@@ -107,8 +107,8 @@ router.get('/categories/:claimCategoryId', Authenticate, async (req, res) => {
 FROM claims
 LEFT JOIN claimSupport cs ON claims.ClaimId = cs.ClaimId
 LEFT JOIN students s ON claims.StudentId = s.StudentId
-WHERE claims.CategoryId = ? and claims.PostId=?
-GROUP BY claims.ClaimId`, [userId, userId, claimCategoryId,]);
+WHERE claims.CategoryId = ?
+GROUP BY claims.ClaimId`, [userId, userId, claimCategoryId]);
         return res.status(200).json(claims);
     } catch (error) {
         return res.status(500).json({ message: `Error fetching claims in category ${claimCategoryId}`, error: error.message });
