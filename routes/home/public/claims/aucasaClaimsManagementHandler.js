@@ -9,8 +9,8 @@ const {Authenticate}=require('../../../../Authentication/authentication');
 router.get('/summary',Authenticate,async(req,res)=>{
     try{
         const [activePosts]=await connectionPromise.query(`select count(*) as ActivePosts from posts where status='active'`);
-        const [activePostClaims]=await connectionPromise.query(`select count(*) as ActivePostClaims from claims where PostId IN (select PostId from posts where status='active')`);
-        const [unreviewedClaims]=await connectionPromise.query(`select count(*) as UnreviewedClaims from claims where ClaimStatus='unreviewed' AND PostId IN (select PostId from posts where status='active')`);
+        const [activePostClaims]=await connectionPromise.query(`select count(*) as ActivePostClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where cc.PostId IN (select Id from posts where status='active')`);
+        const [unreviewedClaims]=await connectionPromise.query(`select count(*) as UnreviewedClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.ClaimStatus='unreviewed' AND cc.PostId IN (select Id from posts where status='active')`);
         return res.status(200).json({ activePosts: activePosts[0].ActivePosts, activePostClaims: activePostClaims[0].ActivePostClaims, unreviewedClaims: unreviewedClaims[0].UnreviewedClaims });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching summary data' });
@@ -45,7 +45,7 @@ router.get('/categories/:claimCategoryId',Authenticate,async(req,res)=>{
         return res.status(400).json({message:'claimCategoryId is required'});
     }
     try{
-        const [claims]=await connectionPromise.query(`select c.ClaimId, c.PostId, c.StudentId,s.Lname,s.ProfileUrl, c.ClaimText, c.ClaimEvidenceUrl, c.VisibilityStatus, c.ClaimStatus,c.DateCreated, (select count(*) from claimSupport where ClaimId=c.ClaimId) as NumberOfSupports from claims c join students s on c.StudentId=s.StudentId where c.CategoryId=?`,[claimCategoryId]);
+        const [claims]=await connectionPromise.query(`select c.ClaimId, cc.PostId, c.StudentId,s.Lname,s.ProfileUrl, c.ClaimText, c.ClaimEvidenceUrl, c.VisibilityStatus, c.ClaimStatus,c.DateCreated, (select count(*) from claimSupport where ClaimId=c.ClaimId) as NumberOfSupports from claims c join students s on c.StudentId=s.StudentId join claimCategory cc on c.CategoryId = cc.CategoryId where c.CategoryId=?`,[claimCategoryId]);
         return res.status(200).json({ claims });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching claims',error: error.message });
@@ -65,7 +65,8 @@ router.get('/postsWithClaims', Authenticate, async (req, res) => {
                 p.ClaimSummary,
                 COUNT(c.ClaimId) AS claimsCount
             FROM posts p
-            INNER JOIN claims c ON c.PostId = p.Id
+            INNER JOIN claimCategory cc ON cc.PostId = p.Id
+            INNER JOIN claims c ON c.CategoryId = cc.CategoryId
             GROUP BY p.Id, p.Title, p.Description, p.Timestamp, p.ClaimSummary
             ORDER BY claimsCount DESC
         `);
@@ -86,7 +87,7 @@ router.get('/post/:postId/claims', Authenticate, async (req, res) => {
         const [claims] = await connectionPromise.query(`
             SELECT
                 c.ClaimId,
-                c.PostId,
+                cc.PostId,
                 c.StudentId,
                 s.Fname,
                 s.Lname,
@@ -101,7 +102,7 @@ router.get('/post/:postId/claims', Authenticate, async (req, res) => {
             FROM claims c
             JOIN students s ON c.StudentId = s.StudentId
             JOIN claimCategory cc ON c.CategoryId = cc.CategoryId
-            WHERE c.PostId = ?
+            WHERE cc.PostId = ?
             ORDER BY c.DateCreated DESC
         `, [postId]);
         return res.status(200).json({ claims });

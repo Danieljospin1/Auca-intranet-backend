@@ -51,7 +51,7 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
         if (ClaimCategoryId) {
             await connectionPromise.query(
                 `INSERT INTO claims (StudentId, ClaimText, CategoryId, ClaimEvidenceUrl, VisibilityStatus)
-                 VALUES ( ?, ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?)`,
                 [userId, ClaimText, ClaimCategoryId, ClaimEvidenceImageFile, ClaimVisibility]
             );
             console.log("Claim submitted with existing category:", ClaimCategoryId);
@@ -69,7 +69,7 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
 
             await connectionPromise.query(
                 `INSERT INTO claims (StudentId, ClaimText, CategoryId, ClaimEvidenceUrl, VisibilityStatus)
-                 VALUES ( ?, ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?)`,
                 [userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]
             );
             console.log("Claim submitted with new category:", NewClaimCategoryText);
