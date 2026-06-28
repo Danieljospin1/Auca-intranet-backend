@@ -10,7 +10,7 @@ router.get('/summary',Authenticate,async(req,res)=>{
     try{
         const [activePosts]=await connectionPromise.query(`select count(*) as ActivePosts from posts where status='active'`);
         const [activePostClaims]=await connectionPromise.query(`select count(*) as ActivePostClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where cc.PostId IN (select Id from posts where status='active')`);
-        const [unreviewedClaims]=await connectionPromise.query(`select count(*) as UnreviewedClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.ClaimStatus='unreviewed' AND cc.PostId IN (select Id from posts where status='active')`);
+        const [unreviewedClaims]=await connectionPromise.query(`select count(*) as UnreviewedClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where c.ClaimStatus='pending' AND cc.PostId IN (select Id from posts where status='active')`);
         return res.status(200).json({ activePosts: activePosts[0].ActivePosts, activePostClaims: activePostClaims[0].ActivePostClaims, unreviewedClaims: unreviewedClaims[0].UnreviewedClaims });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching summary data' });
@@ -62,12 +62,11 @@ router.get('/postsWithClaims', Authenticate, async (req, res) => {
                 p.Title,
                 p.Description,
                 p.Timestamp,
-                p.ClaimSummary,
                 COUNT(c.ClaimId) AS claimsCount
             FROM posts p
             INNER JOIN claimCategory cc ON cc.PostId = p.Id
             INNER JOIN claims c ON c.CategoryId = cc.CategoryId
-            GROUP BY p.Id, p.Title, p.Description, p.Timestamp, p.ClaimSummary
+            GROUP BY p.Id, p.Title, p.Description, p.Timestamp
             ORDER BY claimsCount DESC
         `);
         return res.status(200).json({ posts });
