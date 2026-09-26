@@ -93,11 +93,74 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         if (!post) return console.log("Post not found for socket emission");
         if (audience === 'all') io.to('all').emit('newPost', post);
         if (audience === 'staff') io.to('staff').emit('newPost', post);
-        if (audienceList.length > 0 && audience === 'students') {
-            audienceList.forEach(target => {
-                io.to(target).emit('newPost', post);
-                console.log(`Emitted newPost to ${target} room for post ${post.Id}`);
-            })
+        if (audience === 'students') {
+            if (audienceList.length > 0) {
+                audienceList.forEach(target => {
+                    io.to(target.toLowerCase()).emit('newPost', post);
+                    console.log(`Emitted newPost to ${target} room for post ${post.Id}`);
+                });
+            } else {
+                io.to('students').emit('newPost', post);
+            }
+        }
+    }
+
+    async function createAndEmitNotification(PostId) {
+        try {
+            const isEmergency = req.body.isEmergency === 'true' || req.body.isEmergency === true || /urgent|emergency/i.test(title);
+            const notifTitle = isEmergency ? ` Urgent: ${title}` : title;
+            const notifMessage = description ? (description.length > 120 ? description.substring(0, 117) + '...' : description) : title;
+
+            const [notifResult] = await connectionPromise.query(
+                `INSERT INTO notifications (Title, Message, Type, PostId, SenderId, IsCritical) VALUES (?, ?, 'post', ?, ?, ?)`,
+                [notifTitle, notifMessage, PostId, postedById, isEmergency ? 1 : 0]
+            );
+
+            const notificationId = notifResult.insertId;
+
+            // Store targets in notificationtargets
+            const isPrecisionTargeted = audience === 'students' && audienceList.length > 0;
+            if (isPrecisionTargeted) {
+                const targetValues = audienceList.map(t => [notificationId, 'students', t.toLowerCase()]);
+                await connectionPromise.query(
+                    `INSERT INTO notificationtargets (NotificationId, AudienceType, AudienceValue) VALUES ?`,
+                    [targetValues]
+                );
+            } else {
+                await connectionPromise.query(
+                    `INSERT INTO notificationtargets (NotificationId, AudienceType, AudienceValue) VALUES (?, ?, ?)`,
+                    [notificationId, audience.toLowerCase(), audience.toLowerCase()]
+                );
+            }
+
+            const notificationPayload = {
+                id: String(notificationId),
+                title: notifTitle,
+                message: notifMessage,
+                type: 'post',
+                postId: PostId,
+                senderId: postedById,
+                isEmergency: Boolean(isEmergency),
+                isRead: false,
+                createdAt: new Date().toISOString()
+            };
+
+            // Emit to rooms
+            if (audience === 'all') {
+                io.to('all').emit('newNotification', notificationPayload);
+            } else if (audience === 'staff') {
+                io.to('staff').emit('newNotification', notificationPayload);
+            } else if (audience === 'students') {
+                if (audienceList.length > 0) {
+                    audienceList.forEach(target => {
+                        io.to(target.toLowerCase()).emit('newNotification', notificationPayload);
+                    });
+                } else {
+                    io.to('students').emit('newNotification', notificationPayload);
+                }
+            }
+        } catch (err) {
+            console.error('Error creating/emitting post notification:', err);
         }
     }
     // ─────────────────────────────────────────────────────────────────
@@ -231,6 +294,7 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
         // ── 5. Fetch full post and emit via socket ────────────────────
         const post = await getPostById(PostId);
         emitPost(post);
+        await createAndEmitNotification(PostId);
 
         // ── 6. Respond ────────────────────────────────────────────────
         return res.status(201).json({

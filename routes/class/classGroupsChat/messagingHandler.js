@@ -195,17 +195,19 @@ module.exports = async (io) => {
 
             // join announcement personalized rooms 
             try {
+                socket.join(String(userId));
+                socket.join(`user_${userId}`);
                 socket.join('all');
                 if (userRole === 'staff') {
                     socket.join('staff');
                     console.log('user is staff, joining staff room');
                 } else {
                     socket.join('students');
-                    socket.join(socket.user.StudyLevel.toLowerCase());
-                    socket.join(socket.user.Faculty.toLowerCase());
-                    socket.join(socket.user.Department.toLowerCase());
+                    if (socket.user.StudyLevel) socket.join(socket.user.StudyLevel.toLowerCase());
+                    if (socket.user.Faculty) socket.join(socket.user.Faculty.toLowerCase());
+                    if (socket.user.Department) socket.join(socket.user.Department.toLowerCase());
                     console.log('user is student, joining student room');
-                    console.log(`user joined rooms: students, ${socket.user.StudyLevel.toLowerCase()}, ${socket.user.Faculty.toLowerCase()}, ${socket.user.Department.toLowerCase()}`);
+                    console.log(`user joined rooms: ${userId}, students, ${socket.user.StudyLevel?.toLowerCase()}, ${socket.user.Faculty?.toLowerCase()}, ${socket.user.Department?.toLowerCase()}`);
                 }
             } catch (err) {
                 console.warn('[socket] joining announcement rooms failed', err);

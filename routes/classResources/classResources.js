@@ -55,11 +55,21 @@ router.post('/', uploadBook.single('resourceFile'), Authenticate, async (req, re
                 await connectionPromise.query(`insert into classresources(ClassId,LecturerId,Title,Description,FileUrl,FileType,MimeType,FileSize) 
                 values(?,?,?,?,?,?,?,?)`,[ClassId,userId,title,Description,fileUrl,fileType,mimeType,fileSize])
                 const notificationTitle='New class resource shared'
-                const notificationMessage=`Lecturer shared new class resource -${title}-`
-                const notificationPost=await connectionPromise.query(`insert into notifications(Title,Message,Type,SenderId) values(?,?,?,?)`,[notificationTitle,notificationMessage,'system',userId]);
-                const notificationPostId=notificationPost.insertId;
-                await connectionPromise.query('insert into notificationtargets(NotificationId,AudienceType,AudienceValue) values(?,?,?)',[notificationPostId,'class',ClassId])
-                io.to(ClassId).emit("newNotification",notificationMessage);
+                const [notificationPost] = await connectionPromise.query(`insert into notifications(Title,Message,Type,SenderId) values(?,?,?,?)`,[notificationTitle,notificationMessage,'class_resource',userId]);
+                const notificationPostId = notificationPost.insertId;
+                await connectionPromise.query('insert into notificationtargets(NotificationId,AudienceType,AudienceValue) values(?,?,?)',[notificationPostId,'class',String(ClassId).toLowerCase()]);
+                const notificationPayload = {
+                    id: String(notificationPostId),
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    type: 'class_resource',
+                    classId: ClassId,
+                    senderId: userId,
+                    isEmergency: false,
+                    isRead: false,
+                    createdAt: new Date().toISOString()
+                };
+                io.to(String(ClassId)).emit("newNotification", notificationPayload);
                 res.status(200).json({"message":"Class resource uploded successfully"});
     
             }
