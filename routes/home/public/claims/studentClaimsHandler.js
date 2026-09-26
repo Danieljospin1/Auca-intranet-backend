@@ -60,19 +60,34 @@ router.post('/newClaim', upload.single('ClaimEvidenceImageFile'), Authenticate, 
 
         // ── Case 2: student creates a new category ──
         if (!ClaimCategoryId && NewClaimCategoryText) {
-            const [newCategoryResult] = await connectionPromise.query(
-                `INSERT INTO claimCategory (PostId, CreatedById, CategoryName)
-                 VALUES (?, ?, ?)`,
-                [PostId, userId, NewClaimCategoryText.trim()]
+            const trimmedCategoryName = NewClaimCategoryText.trim();
+
+            // Check if a category with the same name (case-insensitive) already exists for this post
+            const [existingCategory] = await connectionPromise.query(
+                `SELECT CategoryId FROM claimCategory WHERE PostId = ? AND LOWER(CategoryName) = LOWER(?)`,
+                [PostId, trimmedCategoryName]
             );
-            const newCategoryId = newCategoryResult.insertId;
+
+            let targetCategoryId;
+            if (existingCategory && existingCategory.length > 0) {
+                targetCategoryId = existingCategory[0].CategoryId;
+                console.log("Using existing category for new claim:", targetCategoryId);
+            } else {
+                const [newCategoryResult] = await connectionPromise.query(
+                    `INSERT INTO claimCategory (PostId, CreatedById, CategoryName)
+                     VALUES (?, ?, ?)`,
+                    [PostId, userId, trimmedCategoryName]
+                );
+                targetCategoryId = newCategoryResult.insertId;
+                console.log("Created new category:", targetCategoryId, trimmedCategoryName);
+            }
 
             await connectionPromise.query(
                 `INSERT INTO claims (StudentId, ClaimText, CategoryId, ClaimEvidenceUrl, VisibilityStatus)
                  VALUES (?, ?, ?, ?, ?)`,
-                [userId, ClaimText, newCategoryId, ClaimEvidenceImageFile, ClaimVisibility]
+                [userId, ClaimText, targetCategoryId, ClaimEvidenceImageFile, ClaimVisibility]
             );
-            console.log("Claim submitted with new category:", NewClaimCategoryText);
+            console.log("Claim submitted successfully:", trimmedCategoryName);
             return res.status(201).json({ message: 'Claim submitted successfully' });
         }
 
@@ -90,13 +105,13 @@ router.get('/categories', Authenticate, async (req, res) => {
     }
     try {
         const [claimCategories] = await connectionPromise.query(`SELECT
-    cc.CategoryId,
+    MIN(cc.CategoryId) AS CategoryId,
     cc.CategoryName,
     COUNT(c.ClaimId) AS NumberOfClaims
 FROM claimCategory cc
 LEFT JOIN claims c
     ON c.CategoryId = cc.CategoryId where cc.PostId=?
-GROUP BY cc.CategoryId, cc.CategoryName
+GROUP BY LOWER(cc.CategoryName), cc.CategoryName
 ORDER BY cc.CategoryName`, [PostId]);
         return res.status(200).json(claimCategories);
 
@@ -118,7 +133,10 @@ router.get('/categories/:claimCategoryId', Authenticate, async (req, res) => {
         if (category.length === 0) {
             return res.status(404).json({ message: 'Claim category not found' });
         }
-        const [claims] = await connectionPromise.query(`SELECT 
+        const postId = category[0].PostId;
+        const categoryName = category[0].CategoryName;
+        const [claims] = await connectionPromise.query(
+            `SELECT
   claims.*,
   s.Lname,
   COUNT(cs.ClaimId) AS NumberOfSupports,
@@ -127,8 +145,13 @@ router.get('/categories/:claimCategoryId', Authenticate, async (req, res) => {
 FROM claims
 LEFT JOIN claimSupport cs ON claims.ClaimId = cs.ClaimId
 LEFT JOIN students s ON claims.StudentId = s.StudentId
-WHERE claims.CategoryId = ?
-GROUP BY claims.ClaimId`, [userId, userId, claimCategoryId]);
+WHERE claims.CategoryId IN (
+  SELECT CategoryId FROM claimCategory WHERE PostId = ? AND LOWER(CategoryName) = LOWER(?)
+)
+GROUP BY claims.ClaimId, s.Lname
+ORDER BY NumberOfSupports DESC`,
+            [userId, userId, postId, categoryName]
+        );
         return res.status(200).json(claims);
     } catch (error) {
         return res.status(500).json({ message: `Error fetching claims in category ${claimCategoryId}`, error: error.message });
