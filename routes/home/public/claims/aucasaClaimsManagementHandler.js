@@ -2,11 +2,12 @@ const express=require('express');
 const router=express.Router();
 const connectionPromise=require('../../../../database & models/databaseConnection');
 const {Authenticate}=require('../../../../Authentication/authentication');
+const {authorizeClaimsManagement}=require('../../../../Authentication/claimsAuthorization');
 
 
 //creating a get route for aucasa minister of communication to get total number of posts which are active,total number of claims of those active posts and total number of unreviewed claims of those active posts,
 //this route will be used in the dashboard of the minister of communication to show him the overall status of the claims and posts in the system
-router.get('/summary',Authenticate,async(req,res)=>{
+router.get('/summary',Authenticate,authorizeClaimsManagement,async(req,res)=>{
     try{
         const [activePosts]=await connectionPromise.query(`select count(*) as ActivePosts from posts where status='active'`);
         const [activePostClaims]=await connectionPromise.query(`select count(*) as ActivePostClaims from claims c join claimCategory cc on c.CategoryId = cc.CategoryId where cc.PostId IN (select Id from posts where status='active')`);
@@ -18,13 +19,8 @@ router.get('/summary',Authenticate,async(req,res)=>{
 });
 
 //creating put route for aucasa minister of communication to automatically update ClaimStatus of array of claim Ids to reviewed, this route will be used in the dashboard of the minister of communication to review multiple claims at once and also to update the status of those claims to reviewed after reviewing them
-router.put('/review',Authenticate,async(req,res)=>{
+router.put('/review',Authenticate,authorizeClaimsManagement,async(req,res)=>{
     const {ClaimIds}=req.body;
-    //validate strictly user
-    const aucasaUserRole=req.user.aucasaUserRole;
-    if(aucasaUserRole !== 'information and communication'){
-        return res.status(403).json({message:'Access denied. Only minister of communication can review claims.'});
-    }
     if(!ClaimIds || !Array.isArray(ClaimIds) || ClaimIds.length === 0){
         return res.status(400).json({message:'ClaimIds is required and should be a non-empty array'});
     }
@@ -39,7 +35,7 @@ router.put('/review',Authenticate,async(req,res)=>{
 });
 
 //creating get route for aucasa minister of communication to get all claims of a particular ClaimCategory,number of ClaimSupports for each claim and also the details of each claim including student names,profile image and id
-router.get('/categories/:claimCategoryId',Authenticate,async(req,res)=>{
+router.get('/categories/:claimCategoryId',Authenticate,authorizeClaimsManagement,async(req,res)=>{
     const {claimCategoryId}=req.params;
     if(!claimCategoryId){
         return res.status(400).json({message:'claimCategoryId is required'});
@@ -54,7 +50,7 @@ router.get('/categories/:claimCategoryId',Authenticate,async(req,res)=>{
 
 // GET /postsWithClaims — fetches all posts that have at least one claim, ordered by claim count desc.
 // Used by AUCASADashboard left feed.
-router.get('/postsWithClaims', Authenticate, async (req, res) => {
+router.get('/postsWithClaims', Authenticate, authorizeClaimsManagement, async (req, res) => {
     try {
         const [posts] = await connectionPromise.query(`
             SELECT
@@ -77,7 +73,7 @@ router.get('/postsWithClaims', Authenticate, async (req, res) => {
 
 // GET /post/:postId/claims — fetches all claims for a specific post with student details and support count.
 // Used by AUCASADashboard right panel and ClaimDetails page.
-router.get('/post/:postId/claims', Authenticate, async (req, res) => {
+router.get('/post/:postId/claims', Authenticate, authorizeClaimsManagement, async (req, res) => {
     const postId = Number(req.params.postId);
     if (!postId || isNaN(postId)) {
         return res.status(400).json({ message: 'postId is required and must be a valid number' });
@@ -112,13 +108,9 @@ router.get('/post/:postId/claims', Authenticate, async (req, res) => {
 
 // PATCH /post/:postId/summary — saves the minister's claim summary text for a post.
 // Requires the ClaimSummary column on the posts table (TEXT, nullable).
-router.patch('/post/:postId/summary', Authenticate, async (req, res) => {
+router.patch('/post/:postId/summary', Authenticate, authorizeClaimsManagement, async (req, res) => {
     const postId = Number(req.params.postId);
     const { ClaimSummary } = req.body;
-    const aucasaUserRole = req.user.aucasaUserRole;
-    if (aucasaUserRole !== 'information and communication') {
-        return res.status(403).json({ message: 'Access denied. Only minister of communication can save summaries.' });
-    }
     if (!postId || isNaN(postId)) {
         return res.status(400).json({ message: 'postId is required and must be a valid number' });
     }
