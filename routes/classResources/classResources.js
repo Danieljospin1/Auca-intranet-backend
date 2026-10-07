@@ -69,7 +69,11 @@ router.post('/', uploadBook.single('resourceFile'), Authenticate, async (req, re
                     isRead: false,
                     createdAt: new Date().toISOString()
                 };
-                io.to(String(ClassId)).emit("newNotification", notificationPayload);
+                let classRoom = io.to(String(ClassId));
+                if (userId && typeof classRoom.except === 'function') {
+                    classRoom = classRoom.except(String(userId));
+                }
+                classRoom.emit("newNotification", notificationPayload);
                 res.status(200).json({"message":"Class resource uploded successfully"});
     
             }

@@ -211,17 +211,23 @@ router.get('/', Authenticate, async (req, res) => {
             LEFT JOIN notificationdelivery d 
                 ON n.Id = d.NotificationId AND d.ReceiverId = ?
             WHERE 
-                d.ReceiverId = ?
-                OR n.Id IN (
-                    SELECT t.NotificationId FROM notificationtargets t
-                    WHERE LOWER(COALESCE(t.AudienceType, '')) IN (${placeholders})
-                       OR LOWER(COALESCE(t.AudienceValue, '')) IN (${placeholders})
+                (d.ReceiverId = ? AND n.Id NOT IN (SELECT t.NotificationId FROM notificationtargets t))
+                OR (
+                    (n.SenderId != ? OR n.SenderId IS NULL OR n.SenderId = 0)
+                    AND (
+                        d.ReceiverId = ?
+                        OR n.Id IN (
+                            SELECT t.NotificationId FROM notificationtargets t
+                            WHERE LOWER(COALESCE(t.AudienceType, '')) IN (${placeholders})
+                               OR LOWER(COALESCE(t.AudienceValue, '')) IN (${placeholders})
+                        )
+                    )
                 )
             ORDER BY n.CreatedAt DESC
             LIMIT 100
         `;
 
-        const params = [userId, userId, ...audienceMatches, ...audienceMatches];
+        const params = [userId, userId, userId, userId, ...audienceMatches, ...audienceMatches];
         const [rows] = await conn.query(query, params);
 
         const formatted = rows.map(r => ({
@@ -277,9 +283,10 @@ router.patch('/read-all', Authenticate, async (req, res) => {
             `SELECT DISTINCT n.Id FROM notifications n
              LEFT JOIN notificationtargets t ON n.Id = t.NotificationId
              LEFT JOIN notificationdelivery d ON n.Id = d.NotificationId
-             WHERE d.ReceiverId = ? OR t.Id IS NOT NULL
+             WHERE (d.ReceiverId = ? AND n.Id NOT IN (SELECT nt.NotificationId FROM notificationtargets nt))
+                OR ((n.SenderId != ? OR n.SenderId IS NULL OR n.SenderId = 0) AND (d.ReceiverId = ? OR t.Id IS NOT NULL))
              ORDER BY n.CreatedAt DESC LIMIT 100`,
-            [userId]
+            [userId, userId, userId]
         );
 
         if (Array.isArray(notifs) && notifs.length > 0) {

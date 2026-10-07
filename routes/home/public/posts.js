@@ -88,19 +88,27 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────
 
-    // ── helper: emit socket to correct personalized room ──────────────────────────
+    // ── helper: emit socket to correct personalized room excluding creator ───────
+    function emitToRoom(room, event, data, exceptUserId = null) {
+        let emitter = io.to(room);
+        if (exceptUserId && typeof emitter.except === 'function') {
+            emitter = emitter.except(String(exceptUserId));
+        }
+        emitter.emit(event, data);
+    }
+
     function emitPost(post) {
         if (!post) return console.log("Post not found for socket emission");
-        if (audience === 'all') io.to('all').emit('newPost', post);
-        if (audience === 'staff') io.to('staff').emit('newPost', post);
+        if (audience === 'all') emitToRoom('all', 'newPost', post, postedById);
+        if (audience === 'staff') emitToRoom('staff', 'newPost', post, postedById);
         if (audience === 'students') {
             if (audienceList.length > 0) {
                 audienceList.forEach(target => {
-                    io.to(target.toLowerCase()).emit('newPost', post);
+                    emitToRoom(target.toLowerCase(), 'newPost', post, postedById);
                     console.log(`Emitted newPost to ${target} room for post ${post.Id}`);
                 });
             } else {
-                io.to('students').emit('newPost', post);
+                emitToRoom('students', 'newPost', post, postedById);
             }
         }
     }
@@ -145,18 +153,18 @@ router.post('/', upload.single("PostFile"), Authenticate, async (req, res) => {
                 createdAt: new Date().toISOString()
             };
 
-            // Emit to rooms
+            // Emit to rooms excluding creator
             if (audience === 'all') {
-                io.to('all').emit('newNotification', notificationPayload);
+                emitToRoom('all', 'newNotification', notificationPayload, postedById);
             } else if (audience === 'staff') {
-                io.to('staff').emit('newNotification', notificationPayload);
+                emitToRoom('staff', 'newNotification', notificationPayload, postedById);
             } else if (audience === 'students') {
                 if (audienceList.length > 0) {
                     audienceList.forEach(target => {
-                        io.to(target.toLowerCase()).emit('newNotification', notificationPayload);
+                        emitToRoom(target.toLowerCase(), 'newNotification', notificationPayload, postedById);
                     });
                 } else {
-                    io.to('students').emit('newNotification', notificationPayload);
+                    emitToRoom('students', 'newNotification', notificationPayload, postedById);
                 }
             }
         } catch (err) {
